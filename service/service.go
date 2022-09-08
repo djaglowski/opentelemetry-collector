@@ -36,6 +36,21 @@ import (
 	"go.opentelemetry.io/collector/service/telemetry"
 )
 
+const (
+	connectorsFeatureGateID = "service.enableConnectors"
+	connectorsFeatureStage  = featuregate.StageAlpha
+)
+
+func init() {
+	featuregate.GetRegistry().MustRegisterID(
+		connectorsFeatureGateID,
+		connectorsFeatureStage,
+		featuregate.WithRegisterDescription("Enables 'connectors', a new type of component for transmitting signals between pipelines. "+
+			"This change includes a major rewrite of the collector's internal pipeline and component management logic."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector/issues/2336"),
+	)
+}
+
 // Settings holds configuration for building a new service.
 type Settings struct {
 	// BuildInfo provides collector start information.
@@ -194,10 +209,18 @@ func (srv *Service) initExtensionsAndPipeline(ctx context.Context, set Settings,
 		Receivers:       set.Receivers,
 		Processors:      set.Processors,
 		Exporters:       set.Exporters,
+		Connectors:      set.Connectors,
 		PipelineConfigs: cfg.Pipelines,
 	}
-	if srv.host.pipelines, err = buildPipelines(ctx, pSet); err != nil {
-		return fmt.Errorf("cannot build pipelines: %w", err)
+
+	if featuregate.GetRegistry().IsEnabled(connectorsFeatureGateID) {
+		if srv.host.pipelines, err = buildPipelinesGraph(ctx, pSet); err != nil {
+			return fmt.Errorf("cannot build pipelines: %w", err)
+		}
+	} else {
+		if srv.host.pipelines, err = buildPipelines(ctx, pSet); err != nil {
+			return fmt.Errorf("cannot build pipelines: %w", err)
+		}
 	}
 
 	if cfg.Telemetry.Metrics.Level != configtelemetry.LevelNone && cfg.Telemetry.Metrics.Address != "" {
