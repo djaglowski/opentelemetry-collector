@@ -164,6 +164,8 @@ func (col *Collector) setupConfigurationComponents(ctx context.Context) error {
 		ProcessorConfigs:   cfg.Processors,
 		ExporterFactories:  col.set.Factories.Exporters,
 		ExporterConfigs:    cfg.Exporters,
+		ConnectorFactories: col.set.Factories.Connectors,
+		ConnectorConfigs:   cfg.Connectors,
 		ExtensionFactories: col.set.Factories.Extensions,
 		ExtensionConfigs:   cfg.Extensions,
 		AsyncErrorChannel:  col.asyncErrorChannel,

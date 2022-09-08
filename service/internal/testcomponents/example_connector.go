@@ -120,19 +120,18 @@ type ExampleConnector struct {
 	consumer.ConsumeTracesFunc
 	consumer.ConsumeMetricsFunc
 	consumer.ConsumeLogsFunc
-	Started bool
-	Stopped bool
+	componentState
 }
 
 // Start tells the Connector to start.
 func (c *ExampleConnector) Start(_ context.Context, _ component.Host) error {
-	c.Started = true
+	c.started = true
 	return nil
 }
 
 // Shutdown is invoked during shutdown.
 func (c *ExampleConnector) Shutdown(context.Context) error {
-	c.Stopped = true
+	c.stopped = true
 	return nil
 }
 

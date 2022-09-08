@@ -25,6 +25,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtelemetry"
+	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/featuregate"
@@ -34,6 +35,21 @@ import (
 	"go.opentelemetry.io/collector/service/internal/proctelemetry"
 	"go.opentelemetry.io/collector/service/telemetry"
 )
+
+const (
+	connectorsFeatureGateID = "service.enableConnectors"
+	connectorsFeatureStage  = featuregate.StageAlpha
+)
+
+func init() {
+	featuregate.GetRegistry().MustRegisterID(
+		connectorsFeatureGateID,
+		connectorsFeatureStage,
+		featuregate.WithRegisterDescription("Enables 'connectors', a new type of component for transmitting signals between pipelines. "+
+			"This change includes a major rewrite of the collector's internal pipeline and component management logic."),
+		featuregate.WithRegisterReferenceURL("https://github.com/open-telemetry/opentelemetry-collector/issues/2336"),
+	)
+}
 
 // Settings holds configuration for building a new service.
 type Settings struct {
@@ -57,6 +73,12 @@ type Settings struct {
 
 	// ExporterConfigs is a map of component.ID to exporters component.Config.
 	ExporterConfigs map[component.ID]component.Config
+
+	// ConnectorFactories maps connector type names in the config to the respective connector.Factory.
+	ConnectorFactories map[component.Type]connector.Factory
+
+	// ConnectorConfigs is a map of component.ID to exporters component.Config.
+	ConnectorConfigs map[component.ID]component.Config
 
 	// ExtensionConfigs is a map of component.ID to extensions component.Config.
 	ExtensionConfigs map[component.ID]component.Config
@@ -94,6 +116,7 @@ func New(ctx context.Context, set Settings, cfg ConfigService) (*Service, error)
 			receiverFactories:  set.ReceiverFactories,
 			processorFactories: set.ProcessorFactories,
 			exporterFactories:  set.ExporterFactories,
+			connectorFactories: set.ConnectorFactories,
 			extensionFactories: set.ExtensionFactories,
 			buildInfo:          set.BuildInfo,
 			asyncErrorChannel:  set.AsyncErrorChannel,
@@ -205,10 +228,19 @@ func (srv *Service) initExtensionsAndPipeline(ctx context.Context, set Settings,
 		ProcessorConfigs:   set.ProcessorConfigs,
 		ExporterFactories:  srv.host.exporterFactories,
 		ExporterConfigs:    set.ExporterConfigs,
+		ConnectorFactories: srv.host.connectorFactories,
+		ConnectorConfigs:   set.ConnectorConfigs,
 		PipelineConfigs:    cfg.Pipelines,
 	}
-	if srv.host.pipelines, err = buildPipelines(ctx, pSet); err != nil {
-		return fmt.Errorf("cannot build pipelines: %w", err)
+
+	if featuregate.GetRegistry().IsEnabled(connectorsFeatureGateID) {
+		if srv.host.pipelines, err = buildPipelinesGraph(ctx, pSet); err != nil {
+			return fmt.Errorf("cannot build pipelines: %w", err)
+		}
+	} else {
+		if srv.host.pipelines, err = buildPipelines(ctx, pSet); err != nil {
+			return fmt.Errorf("cannot build pipelines: %w", err)
+		}
 	}
 
 	if cfg.Telemetry.Metrics.Level != configtelemetry.LevelNone && cfg.Telemetry.Metrics.Address != "" {

@@ -14,7 +14,22 @@
 
 package otelcoltest // import "go.opentelemetry.io/collector/otelcol/otelcoltest"
 
-import "go.opentelemetry.io/collector/component/componenttest"
+import (
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/connector"
+	"go.opentelemetry.io/collector/connector/connectortest"
+	"go.opentelemetry.io/collector/otelcol"
+)
 
 // NopFactories returns a otelcol.Factories with all nop factories.
-var NopFactories = componenttest.NopFactories // nolint:staticcheck
+func NopFactories() (otelcol.Factories, error) {
+	var factories otelcol.Factories
+	var err error
+	if factories.Factories, err = componenttest.NopFactories(); err != nil { // nolint:staticcheck
+		return otelcol.Factories{}, err
+	}
+	if factories.Connectors, err = connector.MakeFactoryMap(connectortest.NewNopFactory()); err != nil {
+		return otelcol.Factories{}, err
+	}
+	return factories, nil
+}

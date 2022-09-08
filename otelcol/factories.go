@@ -16,8 +16,14 @@ package otelcol // import "go.opentelemetry.io/collector/otelcol"
 
 import (
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/connector"
 )
 
 // Factories struct holds in a single type all component factories that
 // can be handled by the Config.
-type Factories = component.Factories // nolint:staticcheck
+type Factories struct {
+	component.Factories // nolint:staticcheck
+
+	// Connectors maps connector type names in the config to the respective factory.
+	Connectors map[component.Type]connector.Factory
+}

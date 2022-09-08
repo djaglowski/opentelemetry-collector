@@ -16,6 +16,7 @@ package service // import "go.opentelemetry.io/collector/service"
 
 import (
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/processor"
@@ -30,11 +31,12 @@ type serviceHost struct {
 	receiverFactories  map[component.Type]receiver.Factory
 	processorFactories map[component.Type]processor.Factory
 	exporterFactories  map[component.Type]exporter.Factory
+	connectorFactories map[component.Type]connector.Factory
 	extensionFactories map[component.Type]extension.Factory
 
 	buildInfo component.BuildInfo
 
-	pipelines  *builtPipelines
+	pipelines  Pipelines
 	extensions *extensions.Extensions
 }
 

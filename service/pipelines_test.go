@@ -24,6 +24,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/exporter"
@@ -181,7 +182,7 @@ func TestBuildPipelines(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Build the pipeline
-			pipelines, err := buildPipelines(context.Background(), pipelinesSettings{
+			pipelinesInterface, err := buildPipelines(context.Background(), pipelinesSettings{
 				Telemetry: componenttest.NewNopTelemetrySettings(),
 				BuildInfo: component.NewDefaultBuildInfo(),
 				ReceiverFactories: map[component.Type]receiver.Factory{
@@ -209,20 +210,23 @@ func TestBuildPipelines(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
+			pipelines, ok := pipelinesInterface.(*builtPipelines)
+			require.True(t, ok)
+
 			assert.NoError(t, pipelines.StartAll(context.Background(), componenttest.NewNopHost()))
 
 			for dt, pipeline := range test.pipelineConfigs {
 				// Verify exporters created, started and empty.
 				for _, expID := range pipeline.Exporters {
 					exp := pipelines.GetExporters()[dt.Type()][expID].(*testcomponents.ExampleExporter)
-					assert.True(t, exp.Started)
+					assert.True(t, exp.Started())
 					switch dt.Type() {
 					case component.DataTypeTraces:
-						assert.Len(t, exp.Traces, 0)
+						assert.Len(t, exp.RecallTraces(), 0)
 					case component.DataTypeMetrics:
-						assert.Len(t, exp.Metrics, 0)
+						assert.Len(t, exp.RecallMetrics(), 0)
 					case component.DataTypeLogs:
-						assert.Len(t, exp.Logs, 0)
+						assert.Len(t, exp.RecallLogs(), 0)
 					}
 				}
 
@@ -230,13 +234,13 @@ func TestBuildPipelines(t *testing.T) {
 				for i, procID := range pipeline.Processors {
 					processor := pipelines.pipelines[dt].processors[i]
 					assert.Equal(t, procID, processor.id)
-					assert.True(t, processor.comp.(*testcomponents.ExampleProcessor).Started)
+					assert.True(t, processor.comp.(*testcomponents.ExampleProcessor).Started())
 				}
 
 				// Verify receivers created, started and send data to confirm pipelines correctly connected.
 				for _, recvID := range pipeline.Receivers {
 					receiver := pipelines.allReceivers[dt.Type()][recvID].(*testcomponents.ExampleReceiver)
-					assert.True(t, receiver.Started)
+					assert.True(t, receiver.Started())
 				}
 			}
 
@@ -261,13 +265,13 @@ func TestBuildPipelines(t *testing.T) {
 				// Verify receivers shutdown.
 				for _, recvID := range pipeline.Receivers {
 					receiver := pipelines.allReceivers[dt.Type()][recvID].(*testcomponents.ExampleReceiver)
-					assert.True(t, receiver.Stopped)
+					assert.True(t, receiver.Stopped())
 				}
 
 				// Verify processors shutdown.
 				for i := range pipeline.Processors {
 					processor := pipelines.pipelines[dt].processors[i]
-					assert.True(t, processor.comp.(*testcomponents.ExampleProcessor).Stopped)
+					assert.True(t, processor.comp.(*testcomponents.ExampleProcessor).Stopped())
 				}
 
 				// Now verify that exporters received data, and are shutdown.
@@ -275,16 +279,16 @@ func TestBuildPipelines(t *testing.T) {
 					exp := pipelines.GetExporters()[dt.Type()][expID].(*testcomponents.ExampleExporter)
 					switch dt.Type() {
 					case component.DataTypeTraces:
-						require.Len(t, exp.Traces, test.expectedRequests)
-						assert.EqualValues(t, testdata.GenerateTraces(1), exp.Traces[0])
+						require.Len(t, exp.RecallTraces(), test.expectedRequests)
+						assert.EqualValues(t, testdata.GenerateTraces(1), exp.RecallTraces()[0])
 					case component.DataTypeMetrics:
-						require.Len(t, exp.Metrics, test.expectedRequests)
-						assert.EqualValues(t, testdata.GenerateMetrics(1), exp.Metrics[0])
+						require.Len(t, exp.RecallMetrics(), test.expectedRequests)
+						assert.EqualValues(t, testdata.GenerateMetrics(1), exp.RecallMetrics()[0])
 					case component.DataTypeLogs:
-						require.Len(t, exp.Logs, test.expectedRequests)
-						assert.EqualValues(t, testdata.GenerateLogs(1), exp.Logs[0])
+						require.Len(t, exp.RecallLogs(), test.expectedRequests)
+						assert.EqualValues(t, testdata.GenerateLogs(1), exp.RecallLogs()[0])
 					}
-					assert.True(t, exp.Stopped)
+					assert.True(t, exp.Stopped())
 				}
 			}
 		})
@@ -720,6 +724,12 @@ func newBadExporterFactory() exporter.Factory {
 	})
 }
 
+func newBadConnectorFactory() connector.Factory {
+	return connector.NewFactory("bf", func() component.Config {
+		return &struct{}{}
+	})
+}
+
 func newErrReceiverFactory() receiver.Factory {
 	return receiver.NewFactory("err",
 		func() component.Config { return &struct{}{} },
@@ -762,6 +772,42 @@ func newErrExporterFactory() exporter.Factory {
 		exporter.WithMetrics(func(context.Context, exporter.CreateSettings, component.Config) (exporter.Metrics, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUndefined),
+	)
+}
+
+func newErrConnectorFactory() connector.Factory {
+	return connector.NewFactory("err", func() component.Config {
+		return &struct{}{}
+	},
+		connector.WithTracesToTraces(func(context.Context, connector.CreateSettings, component.Config, consumer.Traces) (connector.Traces, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithTracesToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Traces, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithTracesToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Traces, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+
+		connector.WithMetricsToTraces(func(context.Context, connector.CreateSettings, component.Config, consumer.Traces) (connector.Metrics, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithMetricsToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Metrics, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithMetricsToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Metrics, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+
+		connector.WithLogsToTraces(func(context.Context, connector.CreateSettings, component.Config, consumer.Traces) (connector.Logs, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithLogsToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Logs, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		connector.WithLogsToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Logs, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
 	)
 }
 

@@ -49,21 +49,22 @@ func createLogsProcessor(_ context.Context, _ processor.CreateSettings, _ compon
 	return &ExampleProcessor{Logs: nextConsumer}, nil
 }
 
+var _ StatefulComponent = &ExampleProcessor{}
+
 type ExampleProcessor struct {
 	consumer.Traces
 	consumer.Metrics
 	consumer.Logs
-	Started bool
-	Stopped bool
+	componentState
 }
 
 func (ep *ExampleProcessor) Start(_ context.Context, _ component.Host) error {
-	ep.Started = true
+	ep.started = true
 	return nil
 }
 
 func (ep *ExampleProcessor) Shutdown(_ context.Context) error {
-	ep.Stopped = true
+	ep.stopped = true
 	return nil
 }
 
