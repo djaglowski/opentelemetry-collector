@@ -1,0 +1,47 @@
+receivers:
+  nop:
+processors:
+  nop:
+exporters:
+  nop:
+connectors:
+  nop/fork:
+  nop/count:
+  nop/forkagain:
+  nop/logit:
+
+
+service:
+  pipelines:
+    traces/in:
+      receivers: [nop]
+      processors: [nop]
+      exporters: [nop/fork]
+
+    traces/copy1:
+      receivers: [nop/fork]
+      processors: [nop]
+      exporters: [nop/count]
+
+    traces/copy2:
+      receivers: [nop/fork]
+      processors: [nop]
+      exporters: [nop/forkagain]
+
+    traces/copy2a:
+      receivers: [nop/forkagain]
+      processors: [nop]
+      exporters: [nop/count]
+    metrics/count:
+      receivers: [nop/count]
+      processors: [nop]
+      exporters: [nop]
+
+    traces/copy2b:
+      receivers: [nop/forkagain]
+      processors: [nop]
+      exporters: [nop/rawlog]
+    logs/raw:
+      receivers: [nop/rawlog]
+      processors: [nop]
+      exporters: [nop, nop/fork] # cannot loop back to 'nop/fork'

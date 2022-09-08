@@ -1,0 +1,34 @@
+receivers:
+  examplereceiver:
+
+processors:
+  exampleprocessor/prefork:
+  exampleprocessor/type0:
+  exampleprocessor/type1:
+  exampleprocessor/postmerge:
+
+exporters:
+  exampleexporter:
+
+connectors:
+  exampleconnector/fork:
+  exampleconnector/merge:
+
+service:
+  pipelines:
+    metrics/in:
+      receivers: [examplereceiver]
+      processors: [exampleprocessor/prefork]
+      exporters: [exampleconnector/fork]
+    metrics/type0:
+      receivers: [exampleconnector/fork]
+      processors: [exampleprocessor/type0]
+      exporters: [exampleconnector/merge]
+    metrics/type1:
+      receivers: [exampleconnector/fork]
+      processors: [exampleprocessor/type1]
+      exporters: [exampleconnector/merge]
+    metrics/out:
+      receivers: [exampleconnector/merge]
+      processors: [exampleprocessor/postmerge]
+      exporters: [exampleexporter]

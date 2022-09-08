@@ -1,0 +1,34 @@
+receivers:
+  nop:
+processors:
+  nop:
+exporters:
+  nop:
+connectors:
+  nop/conn:
+  nop/conn1:
+  nop/conn2:
+  nop/conn3:
+
+service:
+  pipelines:
+    traces/in:
+      receivers: [nop]
+      processors: [nop]
+      exporters: [nop/conn]
+    traces/1:
+      receivers: [nop/conn]
+      processors: [nop]
+      exporters: [nop/conn1]
+    traces/2:
+      receivers: [nop/conn1]
+      processors: [nop]
+      exporters: [nop/conn2]
+    traces/3:
+      receivers: [nop/conn2]
+      processors: [nop]
+      exporters: [nop/conn3, nop/conn] # loops back
+    traces/out:
+      receivers: [nop/conn3]
+      processors: [nop]
+      exporters: [nop]

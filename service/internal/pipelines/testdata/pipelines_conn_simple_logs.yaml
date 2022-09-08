@@ -1,0 +1,22 @@
+receivers:
+  examplereceiver:
+
+processors:
+  exampleprocessor:
+
+exporters:
+  exampleexporter:
+
+connectors:
+  exampleconnector:
+
+service:
+  pipelines:
+    logs/in:
+      receivers: [examplereceiver]
+      processors: [exampleprocessor]
+      exporters: [exampleconnector]
+    logs/out:
+      receivers: [exampleconnector]
+      processors: [exampleprocessor]
+      exporters: [exampleexporter]
