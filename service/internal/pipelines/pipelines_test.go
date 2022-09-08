@@ -31,6 +31,9 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/internal/testdata"
+	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/service/internal/configunmarshaler"
 	"go.opentelemetry.io/collector/service/internal/testcomponents"
 )
@@ -53,7 +56,7 @@ func TestBuild(t *testing.T) {
 		{
 			name:             "pipelines_simple_multi_proc.yaml",
 			receiverIDs:      []component.ID{component.NewID("examplereceiver")},
-			processorIDs:     []component.ID{component.NewID("exampleprocessor"), component.NewID("exampleprocessor")},
+			processorIDs:     []component.ID{component.NewID("exampleprocessor"), component.NewIDWithName("exampleprocessor", "1")},
 			exporterIDs:      []component.ID{component.NewID("exampleexporter")},
 			expectedRequests: 1,
 		},
@@ -92,59 +95,62 @@ func TestBuild(t *testing.T) {
 			cfg := loadConfig(t, filepath.Join("testdata", test.name), factories)
 
 			// Build the pipeline
-			pipelines, err := Build(context.Background(), toSettings(factories, cfg))
+			pipelinesInterface, err := Build(context.Background(), toSettings(factories, cfg))
 			assert.NoError(t, err)
+
+			pipelines, ok := pipelinesInterface.(*traditionalPipelines)
+			require.True(t, ok)
 
 			assert.NoError(t, pipelines.StartAll(context.Background(), componenttest.NewNopHost()))
 
 			// Verify exporters created, started and empty.
 			for _, expID := range test.exporterIDs {
 				traceExporter := pipelines.GetExporters()[component.DataTypeTraces][expID].(*testcomponents.ExampleExporter)
-				assert.True(t, traceExporter.Started)
-				assert.Equal(t, len(traceExporter.Traces), 0)
+				assert.True(t, traceExporter.Started())
+				assert.Zero(t, len(traceExporter.RecallTraces()))
 
 				// Validate metrics.
 				metricsExporter := pipelines.GetExporters()[component.DataTypeMetrics][expID].(*testcomponents.ExampleExporter)
-				assert.True(t, metricsExporter.Started)
-				assert.Zero(t, len(metricsExporter.Traces))
+				assert.True(t, metricsExporter.Started())
+				assert.Zero(t, len(metricsExporter.RecallMetrics()))
 
 				// Validate logs.
 				logsExporter := pipelines.GetExporters()[component.DataTypeLogs][expID].(*testcomponents.ExampleExporter)
-				assert.True(t, logsExporter.Started)
-				assert.Zero(t, len(logsExporter.Traces))
+				assert.True(t, logsExporter.Started())
+				assert.Zero(t, len(logsExporter.RecallLogs()))
 			}
 
 			// Verify processors created in the given order and started.
 			for i, procID := range test.processorIDs {
 				traceProcessor := pipelines.pipelines[component.NewID(component.DataTypeTraces)].processors[i]
 				assert.Equal(t, procID, traceProcessor.id)
-				assert.True(t, traceProcessor.comp.(*testcomponents.ExampleProcessor).Started)
+				assert.True(t, traceProcessor.comp.(*testcomponents.ExampleProcessor).Started())
 
 				// Validate metrics.
 				metricsProcessor := pipelines.pipelines[component.NewID(component.DataTypeMetrics)].processors[i]
 				assert.Equal(t, procID, metricsProcessor.id)
-				assert.True(t, metricsProcessor.comp.(*testcomponents.ExampleProcessor).Started)
+				assert.True(t, metricsProcessor.comp.(*testcomponents.ExampleProcessor).Started())
 
 				// Validate logs.
 				logsProcessor := pipelines.pipelines[component.NewID(component.DataTypeLogs)].processors[i]
 				assert.Equal(t, procID, logsProcessor.id)
-				assert.True(t, logsProcessor.comp.(*testcomponents.ExampleProcessor).Started)
+				assert.True(t, logsProcessor.comp.(*testcomponents.ExampleProcessor).Started())
 			}
 
 			// Verify receivers created, started and send data to confirm pipelines correctly connected.
 			for _, recvID := range test.receiverIDs {
 				traceReceiver := pipelines.allReceivers[component.DataTypeTraces][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, traceReceiver.Started)
+				assert.True(t, traceReceiver.Started())
 				// Send traces.
 				assert.NoError(t, traceReceiver.ConsumeTraces(context.Background(), testdata.GenerateTraces(1)))
 
 				metricsReceiver := pipelines.allReceivers[component.DataTypeMetrics][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, metricsReceiver.Started)
+				assert.True(t, metricsReceiver.Started())
 				// Send metrics.
 				assert.NoError(t, metricsReceiver.ConsumeMetrics(context.Background(), testdata.GenerateMetrics(1)))
 
 				logsReceiver := pipelines.allReceivers[component.DataTypeLogs][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, logsReceiver.Started)
+				assert.True(t, logsReceiver.Started())
 				// Send logs.
 				assert.NoError(t, logsReceiver.ConsumeLogs(context.Background(), testdata.GenerateLogs(1)))
 			}
@@ -154,48 +160,48 @@ func TestBuild(t *testing.T) {
 			// Verify receivers shutdown.
 			for _, recvID := range test.receiverIDs {
 				traceReceiver := pipelines.allReceivers[component.DataTypeTraces][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, traceReceiver.Stopped)
+				assert.True(t, traceReceiver.Stopped())
 
 				metricsReceiver := pipelines.allReceivers[component.DataTypeMetrics][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, metricsReceiver.Stopped)
+				assert.True(t, metricsReceiver.Stopped())
 
 				logsReceiver := pipelines.allReceivers[component.DataTypeLogs][recvID].(*testcomponents.ExampleReceiver)
-				assert.True(t, logsReceiver.Stopped)
+				assert.True(t, logsReceiver.Stopped())
 			}
 
 			// Verify processors shutdown.
 			for i := range test.processorIDs {
 				traceProcessor := pipelines.pipelines[component.NewID(component.DataTypeTraces)].processors[i]
-				assert.True(t, traceProcessor.comp.(*testcomponents.ExampleProcessor).Stopped)
+				assert.True(t, traceProcessor.comp.(*testcomponents.ExampleProcessor).Stopped())
 
 				// Validate metrics.
 				metricsProcessor := pipelines.pipelines[component.NewID(component.DataTypeMetrics)].processors[i]
-				assert.True(t, metricsProcessor.comp.(*testcomponents.ExampleProcessor).Stopped)
+				assert.True(t, metricsProcessor.comp.(*testcomponents.ExampleProcessor).Stopped())
 
 				// Validate logs.
 				logsProcessor := pipelines.pipelines[component.NewID(component.DataTypeLogs)].processors[i]
-				assert.True(t, logsProcessor.comp.(*testcomponents.ExampleProcessor).Stopped)
+				assert.True(t, logsProcessor.comp.(*testcomponents.ExampleProcessor).Stopped())
 			}
 
 			// Now verify that exporters received data, and are shutdown.
 			for _, expID := range test.exporterIDs {
 				// Validate traces.
 				traceExporter := pipelines.GetExporters()[component.DataTypeTraces][expID].(*testcomponents.ExampleExporter)
-				require.Len(t, traceExporter.Traces, test.expectedRequests)
-				assert.EqualValues(t, testdata.GenerateTraces(1), traceExporter.Traces[0])
-				assert.True(t, traceExporter.Stopped)
+				require.Len(t, traceExporter.RecallTraces(), test.expectedRequests)
+				assert.EqualValues(t, testdata.GenerateTraces(1), traceExporter.RecallTraces()[0])
+				assert.True(t, traceExporter.Stopped())
 
 				// Validate metrics.
 				metricsExporter := pipelines.GetExporters()[component.DataTypeMetrics][expID].(*testcomponents.ExampleExporter)
-				require.Len(t, metricsExporter.Metrics, test.expectedRequests)
-				assert.EqualValues(t, testdata.GenerateMetrics(1), metricsExporter.Metrics[0])
-				assert.True(t, metricsExporter.Stopped)
+				require.Len(t, metricsExporter.RecallMetrics(), test.expectedRequests)
+				assert.EqualValues(t, testdata.GenerateMetrics(1), metricsExporter.RecallMetrics()[0])
+				assert.True(t, metricsExporter.Stopped())
 
 				// Validate logs.
 				logsExporter := pipelines.GetExporters()[component.DataTypeLogs][expID].(*testcomponents.ExampleExporter)
-				require.Len(t, logsExporter.Logs, test.expectedRequests)
-				assert.EqualValues(t, testdata.GenerateLogs(1), logsExporter.Logs[0])
-				assert.True(t, logsExporter.Stopped)
+				require.Len(t, logsExporter.RecallLogs(), test.expectedRequests)
+				assert.EqualValues(t, testdata.GenerateLogs(1), logsExporter.RecallLogs()[0])
+				assert.True(t, logsExporter.Stopped())
 			}
 		})
 	}
@@ -375,6 +381,16 @@ func newBadExporterFactory() component.ExporterFactory {
 	})
 }
 
+func newBadConnectorFactory() component.ConnectorFactory {
+	return component.NewConnectorFactory("bf", func() component.ConnectorConfig {
+		return &struct {
+			config.ConnectorSettings `mapstructure:",squash"` // squash ensures fields are correctly decoded in embedded struct
+		}{
+			ConnectorSettings: config.NewConnectorSettings(component.NewID("bf")),
+		}
+	})
+}
+
 func newErrReceiverFactory() component.ReceiverFactory {
 	return component.NewReceiverFactory("err", func() component.ReceiverConfig {
 		return &struct {
@@ -435,6 +451,46 @@ func newErrExporterFactory() component.ExporterFactory {
 	)
 }
 
+func newErrConnectorFactory() component.ConnectorFactory {
+	return component.NewConnectorFactory("err", func() component.ConnectorConfig {
+		return &struct {
+			config.ConnectorSettings `mapstructure:",squash"` // squash ensures fields are correctly decoded in embedded struct
+		}{
+			ConnectorSettings: config.NewConnectorSettings(component.NewID("bf")),
+		}
+	},
+		component.WithTracesToTracesConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Traces) (component.TracesToTracesConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithTracesToMetricsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Metrics) (component.TracesToMetricsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithTracesToLogsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Logs) (component.TracesToLogsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+
+		component.WithMetricsToTracesConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Traces) (component.MetricsToTracesConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithMetricsToMetricsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Metrics) (component.MetricsToMetricsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithMetricsToLogsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Logs) (component.MetricsToLogsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+
+		component.WithLogsToTracesConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Traces) (component.LogsToTracesConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithLogsToMetricsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Metrics) (component.LogsToMetricsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+		component.WithLogsToLogsConnector(func(context.Context, component.ConnectorCreateSettings, component.ConnectorConfig, consumer.Logs) (component.LogsToLogsConnector, error) {
+			return &errComponent{}, nil
+		}, component.StabilityLevelUnmaintained),
+	)
+}
+
 func toSettings(factories component.Factories, cfg *configSettings) Settings {
 	return Settings{
 		Telemetry:          componenttest.NewNopTelemetrySettings(),
@@ -445,6 +501,8 @@ func toSettings(factories component.Factories, cfg *configSettings) Settings {
 		ProcessorConfigs:   cfg.Processors.GetProcessors(),
 		ExporterFactories:  factories.Exporters,
 		ExporterConfigs:    cfg.Exporters.GetExporters(),
+		ConnectorFactories: factories.Connectors,
+		ConnectorConfigs:   cfg.Connectors.GetConnectors(),
 		PipelineConfigs:    cfg.Service.Pipelines,
 	}
 }
@@ -465,11 +523,42 @@ func (e errComponent) Shutdown(context.Context) error {
 	return errors.New("my error")
 }
 
+func (e errComponent) ConsumeTracesToTraces(ctx context.Context, _ ptrace.Traces) error {
+	return e.ConsumeTraces(ctx, ptrace.NewTraces())
+}
+func (e errComponent) ConsumeTracesToMetrics(ctx context.Context, _ ptrace.Traces) error {
+	return e.ConsumeMetrics(ctx, pmetric.NewMetrics())
+}
+func (e errComponent) ConsumeTracesToLogs(ctx context.Context, _ ptrace.Traces) error {
+	return e.ConsumeLogs(ctx, plog.NewLogs())
+}
+
+func (e errComponent) ConsumeMetricsToTraces(ctx context.Context, _ pmetric.Metrics) error {
+	return e.ConsumeTraces(ctx, ptrace.NewTraces())
+}
+func (e errComponent) ConsumeMetricsToMetrics(ctx context.Context, _ pmetric.Metrics) error {
+	return e.ConsumeMetrics(ctx, pmetric.NewMetrics())
+}
+func (e errComponent) ConsumeMetricsToLogs(ctx context.Context, _ pmetric.Metrics) error {
+	return e.ConsumeLogs(ctx, plog.NewLogs())
+}
+
+func (e errComponent) ConsumeLogsToTraces(ctx context.Context, _ plog.Logs) error {
+	return e.ConsumeTraces(ctx, ptrace.NewTraces())
+}
+func (e errComponent) ConsumeLogsToMetrics(ctx context.Context, _ plog.Logs) error {
+	return e.ConsumeMetrics(ctx, pmetric.NewMetrics())
+}
+func (e errComponent) ConsumeLogsToLogs(ctx context.Context, _ plog.Logs) error {
+	return e.ConsumeLogs(ctx, plog.NewLogs())
+}
+
 // TODO: Remove this by not reading the input from the files, or by providing something similar outside service package.
 type configSettings struct {
 	Receivers  *configunmarshaler.Receivers  `mapstructure:"receivers"`
 	Processors *configunmarshaler.Processors `mapstructure:"processors"`
 	Exporters  *configunmarshaler.Exporters  `mapstructure:"exporters"`
+	Connectors *configunmarshaler.Connectors `mapstructure:"connectors"`
 	Service    *serviceSettings              `mapstructure:"service"`
 }
 
@@ -485,6 +574,7 @@ func loadConfig(t *testing.T, fileName string, factories component.Factories) *c
 		Receivers:  configunmarshaler.NewReceivers(factories.Receivers),
 		Processors: configunmarshaler.NewProcessors(factories.Processors),
 		Exporters:  configunmarshaler.NewExporters(factories.Exporters),
+		Connectors: configunmarshaler.NewConnectors(factories.Connectors),
 	}
 	require.NoError(t, conf.Unmarshal(cfg, confmap.WithErrorUnused()))
 	return cfg

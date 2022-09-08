@@ -100,6 +100,7 @@ const (
 	KindProcessor
 	KindExporter
 	KindExtension
+	KindConnector
 )
 
 // StabilityLevel represents the stability level of the component created by the factory.

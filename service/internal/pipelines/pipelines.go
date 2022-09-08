@@ -55,8 +55,15 @@ type builtPipeline struct {
 	exporters  []builtComponent
 }
 
-// Pipelines is set of all pipelines created from exporter configs.
-type Pipelines struct {
+type Pipelines interface {
+	StartAll(ctx context.Context, host component.Host) error
+	ShutdownAll(ctx context.Context) error
+	GetExporters() map[component.DataType]map[component.ID]component.Exporter
+	HandleZPages(w http.ResponseWriter, r *http.Request)
+}
+
+// traditionalPipelines is set of all pipelines created from exporter configs.
+type traditionalPipelines struct {
 	telemetry component.TelemetrySettings
 
 	allReceivers map[component.DataType]map[component.ID]component.Receiver
@@ -70,7 +77,7 @@ type Pipelines struct {
 // Start with exporters, processors (in reverse configured order), then receivers.
 // This is important so that components that are earlier in the pipeline and reference components that are
 // later in the pipeline do not start sending data to later components which are not yet started.
-func (bps *Pipelines) StartAll(ctx context.Context, host component.Host) error {
+func (bps *traditionalPipelines) StartAll(ctx context.Context, host component.Host) error {
 	bps.telemetry.Logger.Info("Starting exporters...")
 	for dt, expByID := range bps.allExporters {
 		for expID, exp := range expByID {
@@ -113,7 +120,7 @@ func (bps *Pipelines) StartAll(ctx context.Context, host component.Host) error {
 //
 // Shutdown order is the reverse of starting: receivers, processors, then exporters.
 // This gives senders a chance to send all their data to a not "shutdown" component.
-func (bps *Pipelines) ShutdownAll(ctx context.Context) error {
+func (bps *traditionalPipelines) ShutdownAll(ctx context.Context) error {
 	var errs error
 	bps.telemetry.Logger.Info("Stopping receivers...")
 	for _, recvByID := range bps.allReceivers {
@@ -139,7 +146,7 @@ func (bps *Pipelines) ShutdownAll(ctx context.Context) error {
 	return errs
 }
 
-func (bps *Pipelines) GetExporters() map[component.DataType]map[component.ID]component.Exporter {
+func (bps *traditionalPipelines) GetExporters() map[component.DataType]map[component.ID]component.Exporter {
 	exportersMap := make(map[component.DataType]map[component.ID]component.Exporter)
 
 	exportersMap[component.DataTypeTraces] = make(map[component.ID]component.Exporter, len(bps.allExporters[component.DataTypeTraces]))
@@ -155,7 +162,7 @@ func (bps *Pipelines) GetExporters() map[component.DataType]map[component.ID]com
 	return exportersMap
 }
 
-func (bps *Pipelines) HandleZPages(w http.ResponseWriter, r *http.Request) {
+func (bps *traditionalPipelines) HandleZPages(w http.ResponseWriter, r *http.Request) {
 	qValues := r.URL.Query()
 	pipelineName := qValues.Get(zPipelineName)
 	componentName := qValues.Get(zComponentName)
@@ -200,13 +207,19 @@ type Settings struct {
 	// ExporterConfigs is a map of component.ID to component.ExporterConfig.
 	ExporterConfigs map[component.ID]component.ExporterConfig
 
+	// ConnectorFactories maps exporter type names in the config to the respective component.ConnectorFactory.
+	ConnectorFactories map[component.Type]component.ConnectorFactory
+
+	// ConnectorConfigs is a map of component.ID to component.ConnectorConfig.
+	ConnectorConfigs map[component.ID]component.ConnectorConfig
+
 	// PipelineConfigs is a map of component.ID to config.Pipeline.
 	PipelineConfigs map[component.ID]*config.Pipeline
 }
 
 // Build builds all pipelines from config.
-func Build(ctx context.Context, set Settings) (*Pipelines, error) {
-	exps := &Pipelines{
+func Build(ctx context.Context, set Settings) (Pipelines, error) {
+	exps := &traditionalPipelines{
 		telemetry:    set.Telemetry,
 		allReceivers: make(map[component.DataType]map[component.ID]component.Receiver),
 		allExporters: make(map[component.DataType]map[component.ID]component.Exporter),
@@ -568,7 +581,7 @@ func getReceiverStabilityLevel(factory component.ReceiverFactory, dt component.D
 	return component.StabilityLevelUndefined
 }
 
-func (bps *Pipelines) getPipelinesSummaryTableData() zpages.SummaryPipelinesTableData {
+func (bps *traditionalPipelines) getPipelinesSummaryTableData() zpages.SummaryPipelinesTableData {
 	sumData := zpages.SummaryPipelinesTableData{}
 	sumData.Rows = make([]zpages.SummaryPipelinesTableRowData, 0, len(bps.pipelines))
 	for c, p := range bps.pipelines {
@@ -600,4 +613,45 @@ func (bps *Pipelines) getPipelinesSummaryTableData() zpages.SummaryPipelinesTabl
 		return sumData.Rows[i].FullName < sumData.Rows[j].FullName
 	})
 	return sumData
+}
+
+func connectorLogger(logger *zap.Logger, connID component.ID, expPipelineType, rcvrPipelineType component.DataType) *zap.Logger {
+	return logger.With(
+		zap.String(components.ZapKindKey, components.ZapKindExporter),
+		zap.String(components.ZapNameKey, connID.String()),
+		zap.String(components.ZapRoleExporterInPipeline, string(expPipelineType)),
+		zap.String(components.ZapRoleReceiverInPipeline, string(rcvrPipelineType)))
+}
+
+func getConnectorStabilityLevel(factory component.ConnectorFactory, edt, rdt component.DataType) component.StabilityLevel {
+	switch edt {
+	case component.DataTypeTraces:
+		switch rdt {
+		case component.DataTypeTraces:
+			return factory.TracesToTracesConnectorStability()
+		case component.DataTypeMetrics:
+			return factory.TracesToMetricsConnectorStability()
+		case component.DataTypeLogs:
+			return factory.TracesToLogsConnectorStability()
+		}
+	case component.DataTypeMetrics:
+		switch rdt {
+		case component.DataTypeTraces:
+			return factory.MetricsToTracesConnectorStability()
+		case component.DataTypeMetrics:
+			return factory.MetricsToMetricsConnectorStability()
+		case component.DataTypeLogs:
+			return factory.MetricsToLogsConnectorStability()
+		}
+	case component.DataTypeLogs:
+		switch rdt {
+		case component.DataTypeTraces:
+			return factory.LogsToTracesConnectorStability()
+		case component.DataTypeMetrics:
+			return factory.LogsToMetricsConnectorStability()
+		case component.DataTypeLogs:
+			return factory.LogsToLogsConnectorStability()
+		}
+	}
+	return component.StabilityLevelUndefined
 }

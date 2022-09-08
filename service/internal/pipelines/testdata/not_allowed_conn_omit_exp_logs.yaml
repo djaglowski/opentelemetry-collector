@@ -1,0 +1,15 @@
+receivers:
+  nop:
+exporters:
+  nop:
+connectors:
+  nop/conn:
+
+service:
+  pipelines:
+    logs/in:
+      receivers: [nop]
+      exporters: [nop]
+    logs/out:
+      receivers: [nop, nop/conn]
+      exporters: [nop]

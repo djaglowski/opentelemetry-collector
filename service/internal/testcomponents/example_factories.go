@@ -16,6 +16,9 @@ package testcomponents // import "go.opentelemetry.io/collector/service/internal
 
 import (
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 // ExampleComponents registers example factories. This is only used by tests.
@@ -30,5 +33,45 @@ func ExampleComponents() (component.Factories, error) {
 		Exporters: map[component.Type]component.ExporterFactory{
 			ExampleExporterFactory.Type(): ExampleExporterFactory,
 		},
+		Connectors: map[component.Type]component.ConnectorFactory{
+			ExampleConnectorFactory.Type(): ExampleConnectorFactory,
+		},
 	}, nil
+}
+
+type StatefulComponent interface {
+	component.Component
+	Started() bool
+	Stopped() bool
+	RecallTraces() []ptrace.Traces
+	RecallMetrics() []pmetric.Metrics
+	RecallLogs() []plog.Logs
+}
+
+type componentState struct {
+	started bool
+	stopped bool
+	traces  []ptrace.Traces
+	metrics []pmetric.Metrics
+	logs    []plog.Logs
+}
+
+func (cs *componentState) Started() bool {
+	return cs.started
+}
+
+func (cs *componentState) Stopped() bool {
+	return cs.stopped
+}
+
+func (cs *componentState) RecallTraces() []ptrace.Traces {
+	return cs.traces
+}
+
+func (cs *componentState) RecallMetrics() []pmetric.Metrics {
+	return cs.metrics
+}
+
+func (cs *componentState) RecallLogs() []plog.Logs {
+	return cs.logs
 }

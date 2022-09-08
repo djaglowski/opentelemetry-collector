@@ -7,6 +7,8 @@ go 1.18
 require (
 	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/collector v0.64.1
+	go.opentelemetry.io/collector/connector/countconnector v0.0.0
+	go.opentelemetry.io/collector/connector/nopconnector v0.0.0
 	go.opentelemetry.io/collector/exporter/loggingexporter v0.64.1
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.64.1
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.64.1
@@ -79,6 +81,7 @@ require (
 	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b // indirect
 	golang.org/x/text v0.3.8 // indirect
+	gonum.org/v1/gonum v0.12.0 // indirect
 	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -87,6 +90,10 @@ require (
 )
 
 replace go.opentelemetry.io/collector => ../../
+
+replace go.opentelemetry.io/collector/connector/countconnector => ../../connector/countconnector
+
+replace go.opentelemetry.io/collector/connector/nopconnector => ../../connector/nopconnector
 
 replace go.opentelemetry.io/collector/exporter/loggingexporter => ../../exporter/loggingexporter
 

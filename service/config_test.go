@@ -32,6 +32,7 @@ var (
 	errInvalidRecvConfig = errors.New("invalid receiver config")
 	errInvalidExpConfig  = errors.New("invalid exporter config")
 	errInvalidProcConfig = errors.New("invalid processor config")
+	errInvalidConnConfig = errors.New("invalid connector config")
 	errInvalidExtConfig  = errors.New("invalid extension config")
 )
 
@@ -59,6 +60,15 @@ type nopProcConfig struct {
 }
 
 func (nc *nopProcConfig) Validate() error {
+	return nc.validateErr
+}
+
+type nopConnConfig struct {
+	config.ConnectorSettings
+	validateErr error
+}
+
+func (nc *nopConnConfig) Validate() error {
 	return nc.validateErr
 }
 
@@ -149,6 +159,26 @@ func TestConfigValidate(t *testing.T) {
 			expected: errors.New(`pipeline "traces" references exporter "nop/2" which does not exist`),
 		},
 		{
+			name: "invalid-connector-reference-as-receiver",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Receivers = append(pipe.Receivers, component.NewIDWithName("nop", "conn2"))
+				return cfg
+			},
+			expected: errors.New(`pipeline "traces" references receiver "nop/conn2" which does not exist`),
+		},
+		{
+			name: "invalid-connector-reference-as-receiver",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Exporters = append(pipe.Exporters, component.NewIDWithName("nop", "conn2"))
+				return cfg
+			},
+			expected: errors.New(`pipeline "traces" references exporter "nop/conn2" which does not exist`),
+		},
+		{
 			name: "missing-pipeline-receivers",
 			cfgFn: func() *Config {
 				cfg := generateConfig()
@@ -167,6 +197,26 @@ func TestConfigValidate(t *testing.T) {
 				return cfg
 			},
 			expected: errors.New(`pipeline "traces" must have at least one exporter`),
+		},
+		{
+			name: "missing-connector-as-receiver",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Exporters = append(pipe.Exporters, component.NewIDWithName("nop", "conn"))
+				return cfg
+			},
+			expected: errors.New(`connector "nop/conn" must be used as both receiver and exporter but is only used as exporter`),
+		},
+		{
+			name: "missing-connector-as-exporter",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Receivers = append(pipe.Receivers, component.NewIDWithName("nop", "conn"))
+				return cfg
+			},
+			expected: errors.New(`connector "nop/conn" must be used as both receiver and exporter but is only used as receiver`),
 		},
 		{
 			name: "missing-pipelines",
@@ -212,6 +262,52 @@ func TestConfigValidate(t *testing.T) {
 				return cfg
 			},
 			expected: fmt.Errorf(`processor "nop" has invalid configuration: %w`, errInvalidProcConfig),
+		},
+		{
+			name: "invalid-connector-config",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				cfg.Connectors[component.NewIDWithName("nop", "conn")] = &nopConnConfig{
+					ConnectorSettings: config.NewConnectorSettings(component.NewIDWithName("nop", "conn")),
+					validateErr:       errInvalidConnConfig,
+				}
+				return cfg
+			},
+			expected: fmt.Errorf(`connector "nop/conn" has invalid configuration: %w`, errInvalidConnConfig),
+		},
+		{
+			name: "ambiguous-connector-name-as-receiver",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				cfg.Receivers[component.NewID("nop/2")] = &nopRecvConfig{
+					ReceiverSettings: config.NewReceiverSettings(component.NewIDWithName("nop", "2")),
+				}
+				cfg.Connectors[component.NewID("nop/2")] = &nopConnConfig{
+					ConnectorSettings: config.NewConnectorSettings(component.NewIDWithName("nop", "2")),
+				}
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Receivers = append(pipe.Receivers, component.NewIDWithName("nop", "2"))
+				pipe.Exporters = append(pipe.Exporters, component.NewIDWithName("nop", "2"))
+				return cfg
+			},
+			expected: errors.New(`ambiguous id: connector "nop/2" cannot have same id as receiver`),
+		},
+		{
+			name: "ambiguous-connector-name-as-exporter",
+			cfgFn: func() *Config {
+				cfg := generateConfig()
+				cfg.Exporters[component.NewID("nop/2")] = &nopExpConfig{
+					ExporterSettings: config.NewExporterSettings(component.NewIDWithName("nop", "2")),
+				}
+				cfg.Connectors[component.NewID("nop/2")] = &nopConnConfig{
+					ConnectorSettings: config.NewConnectorSettings(component.NewIDWithName("nop", "2")),
+				}
+				pipe := cfg.Service.Pipelines[component.NewID("traces")]
+				pipe.Receivers = append(pipe.Receivers, component.NewIDWithName("nop", "2"))
+				pipe.Exporters = append(pipe.Exporters, component.NewIDWithName("nop", "2"))
+				return cfg
+			},
+			expected: errors.New(`ambiguous id: connector "nop/2" cannot have same id as exporter`),
 		},
 		{
 			name: "invalid-extension-config",
@@ -278,6 +374,11 @@ func generateConfig() *Config {
 		Extensions: map[component.ID]component.ExtensionConfig{
 			component.NewID("nop"): &nopExtConfig{
 				ExtensionSettings: config.NewExtensionSettings(component.NewID("nop")),
+			},
+		},
+		Connectors: map[component.ID]component.ConnectorConfig{
+			component.NewIDWithName("nop", "conn"): &nopConnConfig{
+				ConnectorSettings: config.NewConnectorSettings(component.NewIDWithName("nop", "conn")),
 			},
 		},
 		Service: ConfigService{
