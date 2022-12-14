@@ -785,7 +785,7 @@ func newErrConnectorFactory() connector.Factory {
 		connector.WithTracesToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Traces, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
-		connector.WithTracesToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Traces, error) {
+		connector.WithTracesToLogs(func(context.Context, connector.CreateSettings, component.Config, *connector.LogsConsumerMap) (connector.Traces, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
 
@@ -795,7 +795,7 @@ func newErrConnectorFactory() connector.Factory {
 		connector.WithMetricsToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Metrics, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
-		connector.WithMetricsToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Metrics, error) {
+		connector.WithMetricsToLogs(func(context.Context, connector.CreateSettings, component.Config, *connector.LogsConsumerMap) (connector.Metrics, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
 
@@ -805,7 +805,7 @@ func newErrConnectorFactory() connector.Factory {
 		connector.WithLogsToMetrics(func(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Logs, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
-		connector.WithLogsToLogs(func(context.Context, connector.CreateSettings, component.Config, consumer.Logs) (connector.Logs, error) {
+		connector.WithLogsToLogs(func(context.Context, connector.CreateSettings, component.Config, *connector.LogsConsumerMap) (connector.Logs, error) {
 			return &errComponent{}, nil
 		}, component.StabilityLevelUnmaintained),
 	)

@@ -18,6 +18,8 @@ import (
 	"context"
 	"testing"
 
+	"go.opentelemetry.io/collector/connector"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,7 +50,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, tracesToMetrics.ConsumeTraces(context.Background(), ptrace.NewTraces()))
 	assert.NoError(t, tracesToMetrics.Shutdown(context.Background()))
 
-	tracesToLogs, err := factory.CreateTracesToLogs(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	tracesToLogs, err := factory.CreateTracesToLogs(context.Background(), NewNopCreateSettings(), cfg, connector.NewLogsConsumerMap(&LogsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, tracesToLogs.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, tracesToLogs.ConsumeTraces(context.Background(), ptrace.NewTraces()))
@@ -66,7 +68,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, metricsToMetrics.ConsumeMetrics(context.Background(), pmetric.NewMetrics()))
 	assert.NoError(t, metricsToMetrics.Shutdown(context.Background()))
 
-	metricsToLogs, err := factory.CreateMetricsToLogs(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	metricsToLogs, err := factory.CreateMetricsToLogs(context.Background(), NewNopCreateSettings(), cfg, connector.NewLogsConsumerMap(&LogsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, metricsToLogs.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, metricsToLogs.ConsumeMetrics(context.Background(), pmetric.NewMetrics()))
@@ -84,7 +86,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, logsToMetrics.ConsumeLogs(context.Background(), plog.NewLogs()))
 	assert.NoError(t, logsToMetrics.Shutdown(context.Background()))
 
-	logsToLogs, err := factory.CreateLogsToLogs(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	logsToLogs, err := factory.CreateLogsToLogs(context.Background(), NewNopCreateSettings(), cfg, connector.NewLogsConsumerMap(&LogsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, logsToLogs.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, logsToLogs.ConsumeLogs(context.Background(), plog.NewLogs()))

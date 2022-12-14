@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/connector/connectortest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -46,8 +47,9 @@ func TestForward(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, metricsToMetrics)
 
-	logsSink := new(consumertest.LogsSink)
-	logsToLogs, err := f.CreateLogsToLogs(ctx, set, cfg, logsSink)
+	logsSink := new(connectortest.LogsConsumerSink)
+	lcm := connector.NewLogsConsumerMap(logsSink)
+	logsToLogs, err := f.CreateLogsToLogs(ctx, set, cfg, lcm)
 	assert.NoError(t, err)
 	assert.NotNil(t, logsToLogs)
 

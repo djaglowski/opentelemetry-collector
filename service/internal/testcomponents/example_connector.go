@@ -64,7 +64,8 @@ func createExampleTracesToMetrics(_ context.Context, _ connector.CreateSettings,
 	}, nil
 }
 
-func createExampleTracesToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, logs consumer.Logs) (connector.Traces, error) {
+func createExampleTracesToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, lcm *connector.LogsConsumerMap) (connector.Traces, error) {
+	logs := lcm.Fanout()
 	return &ExampleConnector{
 		ConsumeTracesFunc: func(ctx context.Context, td ptrace.Traces) error {
 			return logs.ConsumeLogs(ctx, testdata.GenerateLogs(td.SpanCount()))
@@ -86,7 +87,8 @@ func createExampleMetricsToMetrics(_ context.Context, _ connector.CreateSettings
 	}, nil
 }
 
-func createExampleMetricsToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, logs consumer.Logs) (connector.Metrics, error) {
+func createExampleMetricsToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, lcm *connector.LogsConsumerMap) (connector.Metrics, error) {
+	logs := lcm.Fanout()
 	return &ExampleConnector{
 		ConsumeMetricsFunc: func(ctx context.Context, md pmetric.Metrics) error {
 			return logs.ConsumeLogs(ctx, testdata.GenerateLogs(md.MetricCount()))
@@ -110,7 +112,8 @@ func createExampleLogsToMetrics(_ context.Context, _ connector.CreateSettings, _
 	}, nil
 }
 
-func createExampleLogsToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, logs consumer.Logs) (connector.Logs, error) {
+func createExampleLogsToLogs(_ context.Context, _ connector.CreateSettings, _ component.Config, lcm *connector.LogsConsumerMap) (connector.Logs, error) {
+	logs := lcm.Fanout()
 	return &ExampleConnector{
 		ConsumeLogsFunc: logs.ConsumeLogs,
 	}, nil

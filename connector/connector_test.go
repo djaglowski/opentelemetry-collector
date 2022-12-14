@@ -189,7 +189,7 @@ func createTracesToTraces(context.Context, CreateSettings, component.Config, con
 func createTracesToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Traces, error) {
 	return nil, nil
 }
-func createTracesToLogs(context.Context, CreateSettings, component.Config, consumer.Logs) (Traces, error) {
+func createTracesToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Traces, error) {
 	return nil, nil
 }
 
@@ -199,7 +199,7 @@ func createMetricsToTraces(context.Context, CreateSettings, component.Config, co
 func createMetricsToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Metrics, error) {
 	return nil, nil
 }
-func createMetricsToLogs(context.Context, CreateSettings, component.Config, consumer.Logs) (Metrics, error) {
+func createMetricsToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Metrics, error) {
 	return nil, nil
 }
 
@@ -209,7 +209,7 @@ func createLogsToTraces(context.Context, CreateSettings, component.Config, consu
 func createLogsToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Logs, error) {
 	return nil, nil
 }
-func createLogsToLogs(context.Context, CreateSettings, component.Config, consumer.Logs) (Logs, error) {
+func createLogsToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Logs, error) {
 	return nil, nil
 }
 

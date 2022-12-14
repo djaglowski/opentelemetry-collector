@@ -89,14 +89,14 @@ func (f *forwardFactory) createLogsToLogs(
 	_ context.Context,
 	set connector.CreateSettings,
 	cfg component.Config,
-	nextConsumer consumer.Logs,
+	nextConsumers *connector.LogsConsumerMap,
 ) (connector.Logs, error) {
 	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
 		return &forward{}, nil
 	})
 
 	conn := comp.Unwrap().(*forward)
-	conn.Logs = nextConsumer
+	conn.Logs = nextConsumers.Fanout()
 	return conn, nil
 }
 

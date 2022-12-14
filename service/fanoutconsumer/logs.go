@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fanoutconsumer // import "go.opentelemetry.io/collector/service/internal/fanoutconsumer"
+// Package fanoutconsumer contains implementations of Traces/Metrics/Logs consumers
+// that fan out the data to multiple other consumers.
+package fanoutconsumer // import "go.opentelemetry.io/collector/service/fanoutconsumer"
 
 import (
 	"context"
@@ -20,61 +22,61 @@ import (
 	"go.uber.org/multierr"
 
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/pdata/plog"
 )
 
-// NewTraces wraps multiple trace consumers in a single one.
+// NewLogs wraps multiple log consumers in a single one.
 // It fanouts the incoming data to all the consumers, and does smart routing:
 //   - Clones only to the consumer that needs to mutate the data.
 //   - If all consumers needs to mutate the data one will get the original data.
-func NewTraces(tcs []consumer.Traces) consumer.Traces {
-	if len(tcs) == 1 {
+func NewLogs(lcs []consumer.Logs) consumer.Logs {
+	if len(lcs) == 1 {
 		// Don't wrap if no need to do it.
-		return tcs[0]
+		return lcs[0]
 	}
-	var pass []consumer.Traces
-	var clone []consumer.Traces
-	for i := 0; i < len(tcs)-1; i++ {
-		if !tcs[i].Capabilities().MutatesData {
-			pass = append(pass, tcs[i])
+	var pass []consumer.Logs
+	var clone []consumer.Logs
+	for i := 0; i < len(lcs)-1; i++ {
+		if !lcs[i].Capabilities().MutatesData {
+			pass = append(pass, lcs[i])
 		} else {
-			clone = append(clone, tcs[i])
+			clone = append(clone, lcs[i])
 		}
 	}
 	// Give the original data to the last consumer if no other read-only consumer,
 	// otherwise put it in the right bucket. Never share the same data between
 	// a mutating and a non-mutating consumer since the non-mutating consumer may process
 	// data async and the mutating consumer may change the data before that.
-	if len(pass) == 0 || !tcs[len(tcs)-1].Capabilities().MutatesData {
-		pass = append(pass, tcs[len(tcs)-1])
+	if len(pass) == 0 || !lcs[len(lcs)-1].Capabilities().MutatesData {
+		pass = append(pass, lcs[len(lcs)-1])
 	} else {
-		clone = append(clone, tcs[len(tcs)-1])
+		clone = append(clone, lcs[len(lcs)-1])
 	}
-	return &tracesConsumer{pass: pass, clone: clone}
+	return &logsConsumer{pass: pass, clone: clone}
 }
 
-type tracesConsumer struct {
-	pass  []consumer.Traces
-	clone []consumer.Traces
+type logsConsumer struct {
+	pass  []consumer.Logs
+	clone []consumer.Logs
 }
 
-func (tsc *tracesConsumer) Capabilities() consumer.Capabilities {
+func (lsc *logsConsumer) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: false}
 }
 
-// ConsumeTraces exports the ptrace.Traces to all consumers wrapped by the current one.
-func (tsc *tracesConsumer) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
+// ConsumeLogs exports the plog.Logs to all consumers wrapped by the current one.
+func (lsc *logsConsumer) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	var errs error
 	// Initially pass to clone exporter to avoid the case where the optimization of sending
 	// the incoming data to a mutating consumer is used that may change the incoming data before
 	// cloning.
-	for _, tc := range tsc.clone {
-		clonedTraces := ptrace.NewTraces()
-		td.CopyTo(clonedTraces)
-		errs = multierr.Append(errs, tc.ConsumeTraces(ctx, clonedTraces))
+	for _, lc := range lsc.clone {
+		clonedLogs := plog.NewLogs()
+		ld.CopyTo(clonedLogs)
+		errs = multierr.Append(errs, lc.ConsumeLogs(ctx, clonedLogs))
 	}
-	for _, tc := range tsc.pass {
-		errs = multierr.Append(errs, tc.ConsumeTraces(ctx, td))
+	for _, lc := range lsc.pass {
+		errs = multierr.Append(errs, lc.ConsumeLogs(ctx, ld))
 	}
 	return errs
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package fanoutconsumer // import "go.opentelemetry.io/collector/service/internal/fanoutconsumer"
+package fanoutconsumer // import "go.opentelemetry.io/collector/consumer/fanoutconsumer"
 
 import (
 	"context"

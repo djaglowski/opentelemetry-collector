@@ -321,30 +321,24 @@ func (g *pipelinesGraph) addConnector(
 func (g *pipelinesGraph) createEdges() {
 	for pipelineID, pg := range g.pipelineGraphs {
 		fanOutToExporters := newFanOutNode(pipelineID)
-
 		for _, exporter := range pg.exporters {
 			g.componentGraph.SetEdge(g.componentGraph.NewEdge(fanOutToExporters, exporter))
 		}
 
+		fanInFromReceivers := newFanInNode(pipelineID)
+		for _, receiver := range pg.receivers {
+			g.componentGraph.SetEdge(g.componentGraph.NewEdge(receiver, fanInFromReceivers))
+		}
+
 		if len(pg.processors) == 0 {
-			for _, receiver := range pg.receivers {
-				g.componentGraph.SetEdge(g.componentGraph.NewEdge(receiver, fanOutToExporters))
-			}
+			g.componentGraph.SetEdge(g.componentGraph.NewEdge(fanInFromReceivers, fanOutToExporters))
 			continue
 		}
 
-		fanInToProcessors := newFanInNode(pipelineID)
-
-		for _, receiver := range pg.receivers {
-			g.componentGraph.SetEdge(g.componentGraph.NewEdge(receiver, fanInToProcessors))
-		}
-
-		g.componentGraph.SetEdge(g.componentGraph.NewEdge(fanInToProcessors, pg.processors[0]))
-
+		g.componentGraph.SetEdge(g.componentGraph.NewEdge(fanInFromReceivers, pg.processors[0]))
 		for i := 0; i+1 < len(pg.processors); i++ {
 			g.componentGraph.SetEdge(g.componentGraph.NewEdge(pg.processors[i], pg.processors[i+1]))
 		}
-
 		g.componentGraph.SetEdge(g.componentGraph.NewEdge(pg.processors[len(pg.processors)-1], fanOutToExporters))
 	}
 }
@@ -415,7 +409,10 @@ func (g *pipelinesGraph) buildNodes(ctx context.Context, tel component.Telemetry
 			if len(nexts) != 1 {
 				return fmt.Errorf("fan-in in pipeline %q must have one consumer: %w", n.pipelineID, err)
 			}
-			n.build(nexts[0], g.nextProcessors(n.ID()))
+			err = n.build(nexts[0], g.nextProcessors(n.ID()))
+			if err != nil {
+				return err
+			}
 		case *fanOutNode:
 			nexts := g.nextConsumers(n.ID())
 			if len(nexts) == 0 {
@@ -447,7 +444,7 @@ func (g *pipelinesGraph) nextConsumers(nodeID int64) []baseConsumer {
 		case *connectorNode:
 			nextConsumers = append(nextConsumers, next.Component.(baseConsumer))
 		case *fanInNode:
-			nextConsumers = append(nextConsumers, next.baseConsumer)
+			nextConsumers = append(nextConsumers, next)
 		case *fanOutNode:
 			nextConsumers = append(nextConsumers, next.baseConsumer)
 		default:

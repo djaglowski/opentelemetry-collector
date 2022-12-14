@@ -3,8 +3,12 @@
 package main
 
 import (
+	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter"
+	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver"
+
 	"go.opentelemetry.io/collector/connector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
+	routeconnector "go.opentelemetry.io/collector/connector/routeconnector"
 	"go.opentelemetry.io/collector/exporter"
 	loggingexporter "go.opentelemetry.io/collector/exporter/loggingexporter"
 	otlpexporter "go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -34,6 +38,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Receivers, err = receiver.MakeFactoryMap(
 		otlpreceiver.NewFactory(),
+		filelogreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -43,6 +48,7 @@ func components() (otelcol.Factories, error) {
 		loggingexporter.NewFactory(),
 		otlpexporter.NewFactory(),
 		otlphttpexporter.NewFactory(),
+		fileexporter.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -58,6 +64,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Connectors, err = connector.MakeFactoryMap(
 		forwardconnector.NewFactory(),
+		routeconnector.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

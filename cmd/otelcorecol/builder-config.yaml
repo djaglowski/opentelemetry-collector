@@ -7,10 +7,12 @@ dist:
 
 receivers:
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.67.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.67.0
 exporters:
   - gomod: go.opentelemetry.io/collector/exporter/loggingexporter v0.67.0
   - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.67.0
   - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.67.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.67.0
 extensions:
   - gomod: go.opentelemetry.io/collector/extension/ballastextension v0.67.0
   - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.67.0
@@ -18,8 +20,8 @@ processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.67.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.67.0
 connectors:
-  - import: go.opentelemetry.io/collector/connector/forwardconnector
-    gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.67.0
+  - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.67.0
+  - gomod: go.opentelemetry.io/collector/connector/routeconnector v0.67.0
 
 replaces:
   - go.opentelemetry.io/collector => ../../
@@ -27,6 +29,7 @@ replaces:
   - go.opentelemetry.io/collector/confmap => ../../confmap
   - go.opentelemetry.io/collector/consumer => ../../consumer
   - go.opentelemetry.io/collector/connector/forwardconnector => ../../connector/forwardconnector
+  - go.opentelemetry.io/collector/connector/routeconnector => ../../connector/routeconnector
   - go.opentelemetry.io/collector/exporter/loggingexporter => ../../exporter/loggingexporter
   - go.opentelemetry.io/collector/exporter/otlpexporter => ../../exporter/otlpexporter
   - go.opentelemetry.io/collector/exporter/otlphttpexporter => ../../exporter/otlphttpexporter

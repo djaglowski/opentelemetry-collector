@@ -27,8 +27,8 @@ import (
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/service/fanoutconsumer"
 	"go.opentelemetry.io/collector/service/internal/components"
-	"go.opentelemetry.io/collector/service/internal/fanoutconsumer"
 )
 
 type componentNodeID int64
@@ -337,28 +337,28 @@ func (n *connectorNode) build(
 			}
 		}
 	case component.DataTypeLogs:
-		var consumers []consumer.Logs
+		var consumers []connector.LogsConsumer
 		for _, next := range nexts {
-			logsConsumer, ok := next.(consumer.Logs)
+			logsConsumer, ok := next.(connector.LogsConsumer)
 			if !ok {
 				return fmt.Errorf("next component is not a logs consumer: %s", n.componentID)
 			}
 			consumers = append(consumers, logsConsumer)
 		}
-		fanoutConsumer := fanoutconsumer.NewLogs(consumers)
+		logsConsumerMap := connector.NewLogsConsumerMap(consumers...)
 		switch n.exprPipelineType {
 		case component.DataTypeTraces:
-			n.Component, err = n.factory.CreateTracesToLogs(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateTracesToLogs(ctx, set, n.cfg, logsConsumerMap)
 			if err != nil {
 				return err
 			}
 		case component.DataTypeMetrics:
-			n.Component, err = n.factory.CreateMetricsToLogs(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateMetricsToLogs(ctx, set, n.cfg, logsConsumerMap)
 			if err != nil {
 				return err
 			}
 		case component.DataTypeLogs:
-			n.Component, err = n.factory.CreateLogsToLogs(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateLogsToLogs(ctx, set, n.cfg, logsConsumerMap)
 			if err != nil {
 				return err
 			}
@@ -373,25 +373,57 @@ func (n *connectorNode) build(
 // The componentNodeID is derived from "pipeline ID".
 type fanInNode struct {
 	componentNodeID
-	pipelineID component.ID
-	baseConsumer
-	consumer.Capabilities
+	pipelineID   component.ID
+	nextConsumer baseConsumer
+	cap          consumer.Capabilities
+	consumer.ConsumeTracesFunc
+	consumer.ConsumeMetricsFunc
+	consumer.ConsumeLogsFunc
 }
 
 func newFanInNode(pipelineID component.ID) *fanInNode {
 	return &fanInNode{
 		componentNodeID: newComponentNodeID("fanin_to_processors", pipelineID.String()),
 		pipelineID:      pipelineID,
-		Capabilities:    consumer.Capabilities{},
+		cap:             consumer.Capabilities{},
 	}
 }
 
-func (n *fanInNode) build(nextConsumer baseConsumer, processors []*processorNode) {
-	n.baseConsumer = nextConsumer
+func (n *fanInNode) build(nextConsumer baseConsumer, processors []*processorNode) error {
+	switch n.pipelineID.Type() {
+	case component.DataTypeTraces:
+		tc, ok := nextConsumer.(consumer.Traces)
+		if !ok {
+			return fmt.Errorf("next component is not a traces consumer: %s", n.pipelineID)
+		}
+		n.nextConsumer, n.ConsumeTracesFunc = tc, tc.ConsumeTraces
+	case component.DataTypeMetrics:
+		mc, ok := nextConsumer.(consumer.Metrics)
+		if !ok {
+			return fmt.Errorf("next component is not a metrics consumer: %s", n.pipelineID)
+		}
+		n.nextConsumer, n.ConsumeMetricsFunc = mc, mc.ConsumeMetrics
+	case component.DataTypeLogs:
+		lc, ok := nextConsumer.(consumer.Logs)
+		if !ok {
+			return fmt.Errorf("next component is not a logs consumer: %s", n.pipelineID)
+		}
+		n.nextConsumer, n.ConsumeLogsFunc = lc, lc.ConsumeLogs
+	}
+
 	for _, proc := range processors {
-		n.Capabilities.MutatesData = n.Capabilities.MutatesData ||
+		n.cap.MutatesData = n.cap.MutatesData ||
 			proc.Component.(baseConsumer).Capabilities().MutatesData
 	}
+	return nil
+}
+
+func (n *fanInNode) PipelineID() component.ID {
+	return n.pipelineID
+}
+
+func (n *fanInNode) Capabilities() consumer.Capabilities {
+	return n.cap
 }
 
 // Each pipeline has one fan-out node before exporters.
