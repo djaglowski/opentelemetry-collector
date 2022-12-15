@@ -57,7 +57,7 @@ func createTracesToTracesConnector(context.Context, connector.CreateSettings, co
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
-func createTracesToMetricsConnector(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Traces, error) {
+func createTracesToMetricsConnector(context.Context, connector.CreateSettings, component.Config, *connector.MetricsConsumerMap) (connector.Traces, error) {
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
@@ -69,7 +69,7 @@ func createMetricsToTracesConnector(context.Context, connector.CreateSettings, c
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
-func createMetricsToMetricsConnector(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Metrics, error) {
+func createMetricsToMetricsConnector(context.Context, connector.CreateSettings, component.Config, *connector.MetricsConsumerMap) (connector.Metrics, error) {
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
@@ -81,7 +81,7 @@ func createLogsToTracesConnector(context.Context, connector.CreateSettings, comp
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
-func createLogsToMetricsConnector(context.Context, connector.CreateSettings, component.Config, consumer.Metrics) (connector.Logs, error) {
+func createLogsToMetricsConnector(context.Context, connector.CreateSettings, component.Config, *connector.MetricsConsumerMap) (connector.Logs, error) {
 	return &nopConnector{Consumer: consumertest.NewNop()}, nil
 }
 
@@ -94,6 +94,14 @@ type nopConnector struct {
 	component.StartFunc
 	component.ShutdownFunc
 	consumertest.Consumer
+}
+
+type MetricsConsumerSink struct {
+	consumertest.MetricsSink
+}
+
+func (l *MetricsConsumerSink) PipelineID() component.ID {
+	return component.NewIDWithName("metrics", "sink")
 }
 
 type LogsConsumerSink struct {

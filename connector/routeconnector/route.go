@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/internal/sharedcomponent"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
 const (
@@ -59,7 +60,10 @@ func (c *Config) Validate() error {
 type Condition string
 
 // TODO placeholder
-func (c Condition) True(ld plog.Logs) bool {
+func (c Condition) MatchLogs(ld plog.Logs) bool {
+	return c == "true"
+}
+func (c Condition) MatchMetrics(md pmetric.Metrics) bool {
 	return c == "true"
 }
 
@@ -83,7 +87,7 @@ func NewFactory() connector.Factory {
 		typeStr,
 		createDefaultConfig,
 		// connector.WithTracesToTraces(f.createTracesToTraces, component.StabilityLevelDevelopment),
-		// connector.WithMetricsToMetrics(f.createMetricsToMetrics, component.StabilityLevelDevelopment),
+		connector.WithMetricsToMetrics(f.createMetrics, component.StabilityLevelDevelopment),
 		connector.WithLogsToLogs(f.createLogs, component.StabilityLevelDevelopment),
 	)
 }
@@ -109,21 +113,57 @@ func createDefaultConfig() component.Config {
 // 	return conn, nil
 // }
 
-// // createMetricsToMetrics creates a metrics receiver based on provided config.
-// func (f *routeFactory) createMetricsToMetrics(
-// 	_ context.Context,
-// 	set connector.CreateSettings,
-// 	cfg component.Config,
-// 	nextConsumer consumer.Metrics,
-// ) (connector.Metrics, error) {
-// 	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
-// 		return &forward{}, nil
-// 	})
+type metricsConsumerRoute struct {
+	Condition
+	consumer.Metrics
+}
 
-// 	conn := comp.Unwrap().(*forward)
-// 	conn.Metrics = nextConsumer
-// 	return conn, nil
-// }
+// createMetrics creates a metric router that may emit to only a
+// subset of its downstream consumers. Rather than giving it a fanout
+// consumer, we need to give it the means to decide which consumer
+// should be called. In some cases, it may emit to more than one
+// consumer, in which case we want to make sure they use a fanoutconsumer,
+// but we don't want them to have to build it every time.
+func (f *routeFactory) createMetrics(
+	_ context.Context,
+	set connector.CreateSettings,
+	cfg component.Config,
+	nextConsumers *connector.MetricsConsumerMap,
+) (connector.Metrics, error) {
+	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
+		rCfg, ok := cfg.(*Config)
+		if !ok {
+			return nil, fmt.Errorf("not a route config")
+		}
+
+		r := &router{metricRoutes: []metricsConsumerRoute{}}
+		for _, tr := range rCfg.Table {
+			cons, err := nextConsumers.FanoutToPipelines(tr.Pipelines)
+			if err != nil {
+				return nil, err
+			}
+			r.metricRoutes = append(r.metricRoutes, metricsConsumerRoute{
+				Condition: tr.Condition,
+				Metrics:   cons,
+			})
+		}
+
+		if rCfg.Default != nil {
+			cons, err := nextConsumers.FanoutToPipelines(rCfg.Default)
+			if err != nil {
+				return nil, err
+			}
+			r.metricRoutes = append(r.metricRoutes, metricsConsumerRoute{
+				Condition: "true",
+				Metrics:   cons,
+			})
+		}
+		return r, nil
+	})
+
+	conn := comp.Unwrap().(*router)
+	return conn, nil
+}
 
 type logsConsumerRoute struct {
 	Condition
@@ -182,16 +222,28 @@ func (f *routeFactory) createLogs(
 // than one way. It can also be used to join pipelines together.
 type router struct {
 	// consumer.Traces
-	// consumer.Metrics
-	logRoutes []logsConsumerRoute
+	metricRoutes []metricsConsumerRoute
+	logRoutes    []logsConsumerRoute
 	component.StartFunc
 	component.ShutdownFunc
 	// TODO state tracking here - (requires sharedcomponent)
 }
 
+func (r *router) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
+	for _, route := range r.metricRoutes {
+		if route.Condition.MatchMetrics(md) {
+			if err := route.ConsumeMetrics(ctx, md); err != nil {
+				return err
+			}
+		}
+	}
+	// TODO error? for now, drop logs
+	return nil
+}
+
 func (r *router) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	for _, route := range r.logRoutes {
-		if route.Condition.True(ld) {
+		if route.Condition.MatchLogs(ld) {
 			if err := route.ConsumeLogs(ctx, ld); err != nil {
 				return err
 			}

@@ -42,8 +42,9 @@ func TestForward(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, tracesToTraces)
 
-	metricsSink := new(consumertest.MetricsSink)
-	metricsToMetrics, err := f.CreateMetricsToMetrics(ctx, set, cfg, metricsSink)
+	metricsSink := new(connectortest.MetricsConsumerSink)
+	mcm := connector.NewMetricsConsumerMap(metricsSink)
+	metricsToMetrics, err := f.CreateMetricsToMetrics(ctx, set, cfg, mcm)
 	assert.NoError(t, err)
 	assert.NotNil(t, metricsToMetrics)
 

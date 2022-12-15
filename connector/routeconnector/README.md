@@ -49,7 +49,7 @@ service:
 
 This is a very preliminary implementation:
 
-- Only supports logs
+- Only supports logs & metrics
 - "Conditions" are not actually supported yet. Currently, routes only to defualt route, or to
  a route with `condition: "true"`
 
@@ -63,7 +63,7 @@ which the connector is used as a receiver is referred to below as the "Receiver 
 | Exporter pipeline | Receiver pipeline | Stability         |
 | ----------------- | ----------------- | ----------------- |
 | traces            | traces            | [in development] (soon) |
-| metrics           | metrics           | [in development] (soon) |
+| metrics           | metrics           | [in development]  |
 | logs              | logs              | [in development]  |
 
 [in development]:https://github.com/open-telemetry/opentelemetry-collector#in-development

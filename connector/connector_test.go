@@ -186,7 +186,7 @@ func TestNewFactoryWithAllTypes(t *testing.T) {
 func createTracesToTraces(context.Context, CreateSettings, component.Config, consumer.Traces) (Traces, error) {
 	return nil, nil
 }
-func createTracesToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Traces, error) {
+func createTracesToMetrics(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Traces, error) {
 	return nil, nil
 }
 func createTracesToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Traces, error) {
@@ -196,7 +196,7 @@ func createTracesToLogs(context.Context, CreateSettings, component.Config, *Logs
 func createMetricsToTraces(context.Context, CreateSettings, component.Config, consumer.Traces) (Metrics, error) {
 	return nil, nil
 }
-func createMetricsToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Metrics, error) {
+func createMetricsToMetrics(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Metrics, error) {
 	return nil, nil
 }
 func createMetricsToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Metrics, error) {
@@ -206,7 +206,7 @@ func createMetricsToLogs(context.Context, CreateSettings, component.Config, *Log
 func createLogsToTraces(context.Context, CreateSettings, component.Config, consumer.Traces) (Logs, error) {
 	return nil, nil
 }
-func createLogsToMetrics(context.Context, CreateSettings, component.Config, consumer.Metrics) (Logs, error) {
+func createLogsToMetrics(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Logs, error) {
 	return nil, nil
 }
 func createLogsToLogs(context.Context, CreateSettings, component.Config, *LogsConsumerMap) (Logs, error) {

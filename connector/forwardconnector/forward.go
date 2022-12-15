@@ -73,14 +73,14 @@ func (f *forwardFactory) createMetricsToMetrics(
 	_ context.Context,
 	set connector.CreateSettings,
 	cfg component.Config,
-	nextConsumer consumer.Metrics,
+	nextConsumers *connector.MetricsConsumerMap,
 ) (connector.Metrics, error) {
 	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
 		return &forward{}, nil
 	})
 
 	conn := comp.Unwrap().(*forward)
-	conn.Metrics = nextConsumer
+	conn.Metrics = nextConsumers.Fanout()
 	return conn, nil
 }
 

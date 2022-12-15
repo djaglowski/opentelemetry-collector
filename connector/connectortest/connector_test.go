@@ -44,7 +44,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, tracesToTraces.ConsumeTraces(context.Background(), ptrace.NewTraces()))
 	assert.NoError(t, tracesToTraces.Shutdown(context.Background()))
 
-	tracesToMetrics, err := factory.CreateTracesToMetrics(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	tracesToMetrics, err := factory.CreateTracesToMetrics(context.Background(), NewNopCreateSettings(), cfg, connector.NewMetricsConsumerMap(&MetricsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, tracesToMetrics.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, tracesToMetrics.ConsumeTraces(context.Background(), ptrace.NewTraces()))
@@ -62,7 +62,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, metricsToTraces.ConsumeMetrics(context.Background(), pmetric.NewMetrics()))
 	assert.NoError(t, metricsToTraces.Shutdown(context.Background()))
 
-	metricsToMetrics, err := factory.CreateMetricsToMetrics(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	metricsToMetrics, err := factory.CreateMetricsToMetrics(context.Background(), NewNopCreateSettings(), cfg, connector.NewMetricsConsumerMap(&MetricsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, metricsToMetrics.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, metricsToMetrics.ConsumeMetrics(context.Background(), pmetric.NewMetrics()))
@@ -80,7 +80,7 @@ func TestNewNopConnectorFactory(t *testing.T) {
 	assert.NoError(t, logsToTraces.ConsumeLogs(context.Background(), plog.NewLogs()))
 	assert.NoError(t, logsToTraces.Shutdown(context.Background()))
 
-	logsToMetrics, err := factory.CreateLogsToMetrics(context.Background(), NewNopCreateSettings(), cfg, consumertest.NewNop())
+	logsToMetrics, err := factory.CreateLogsToMetrics(context.Background(), NewNopCreateSettings(), cfg, connector.NewMetricsConsumerMap(&MetricsConsumerSink{}))
 	require.NoError(t, err)
 	assert.NoError(t, logsToMetrics.Start(context.Background(), componenttest.NewNopHost()))
 	assert.NoError(t, logsToMetrics.ConsumeLogs(context.Background(), plog.NewLogs()))

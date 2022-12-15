@@ -310,28 +310,29 @@ func (n *connectorNode) build(
 			}
 		}
 	case component.DataTypeMetrics:
-		var consumers []consumer.Metrics
+		var consumers []connector.MetricsConsumer
 		for _, next := range nexts {
-			metricsConsumer, ok := next.(consumer.Metrics)
+			metricsConsumer, ok := next.(connector.MetricsConsumer)
 			if !ok {
 				return fmt.Errorf("next component is not a metrics consumer: %s", n.componentID)
 			}
 			consumers = append(consumers, metricsConsumer)
 		}
-		fanoutConsumer := fanoutconsumer.NewMetrics(consumers)
+		metricsConsumerMap := connector.NewMetricsConsumerMap(consumers...)
+
 		switch n.exprPipelineType {
 		case component.DataTypeTraces:
-			n.Component, err = n.factory.CreateTracesToMetrics(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateTracesToMetrics(ctx, set, n.cfg, metricsConsumerMap)
 			if err != nil {
 				return err
 			}
 		case component.DataTypeMetrics:
-			n.Component, err = n.factory.CreateMetricsToMetrics(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateMetricsToMetrics(ctx, set, n.cfg, metricsConsumerMap)
 			if err != nil {
 				return err
 			}
 		case component.DataTypeLogs:
-			n.Component, err = n.factory.CreateLogsToMetrics(ctx, set, n.cfg, fanoutConsumer)
+			n.Component, err = n.factory.CreateLogsToMetrics(ctx, set, n.cfg, metricsConsumerMap)
 			if err != nil {
 				return err
 			}

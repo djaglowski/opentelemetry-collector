@@ -109,15 +109,15 @@ type Factory interface {
 	CreateDefaultConfig() component.Config
 
 	CreateTracesToTraces(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Traces) (Traces, error)
-	CreateTracesToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Metrics) (Traces, error)
+	CreateTracesToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer *MetricsConsumerMap) (Traces, error)
 	CreateTracesToLogs(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumers *LogsConsumerMap) (Traces, error)
 
 	CreateMetricsToTraces(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Traces) (Metrics, error)
-	CreateMetricsToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Metrics) (Metrics, error)
+	CreateMetricsToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer *MetricsConsumerMap) (Metrics, error)
 	CreateMetricsToLogs(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumers *LogsConsumerMap) (Metrics, error)
 
 	CreateLogsToTraces(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Traces) (Logs, error)
-	CreateLogsToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer consumer.Metrics) (Logs, error)
+	CreateLogsToMetrics(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumer *MetricsConsumerMap) (Logs, error)
 	CreateLogsToLogs(ctx context.Context, set CreateSettings, cfg component.Config, nextConsumers *LogsConsumerMap) (Logs, error)
 
 	TracesToTracesStability() component.StabilityLevel
@@ -164,19 +164,19 @@ func (f CreateTracesToTracesFunc) CreateTracesToTraces(
 }
 
 // CreateTracesToMetricsFunc is the equivalent of Factory.CreateTracesToMetrics().
-type CreateTracesToMetricsFunc func(context.Context, CreateSettings, component.Config, consumer.Metrics) (Traces, error)
+type CreateTracesToMetricsFunc func(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Traces, error)
 
 // CreateTracesToMetrics implements Factory.CreateTracesToMetrics().
 func (f CreateTracesToMetricsFunc) CreateTracesToMetrics(
 	ctx context.Context,
 	set CreateSettings,
 	cfg component.Config,
-	nextConsumer consumer.Metrics,
+	nextConsumers *MetricsConsumerMap,
 ) (Traces, error) {
 	if f == nil {
 		return nil, errTracesToMetrics
 	}
-	return f(ctx, set, cfg, nextConsumer)
+	return f(ctx, set, cfg, nextConsumers)
 }
 
 // CreateTracesToLogsFunc is the equivalent of Factory.CreateTracesToLogs().
@@ -212,19 +212,19 @@ func (f CreateMetricsToTracesFunc) CreateMetricsToTraces(
 }
 
 // CreateMetricsToMetricsFunc is the equivalent of Factory.CreateMetricsToTraces().
-type CreateMetricsToMetricsFunc func(context.Context, CreateSettings, component.Config, consumer.Metrics) (Metrics, error)
+type CreateMetricsToMetricsFunc func(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Metrics, error)
 
 // CreateMetricsToTraces implements Factory.CreateMetricsToTraces().
 func (f CreateMetricsToMetricsFunc) CreateMetricsToMetrics(
 	ctx context.Context,
 	set CreateSettings,
 	cfg component.Config,
-	nextConsumer consumer.Metrics,
+	nextConsumers *MetricsConsumerMap,
 ) (Metrics, error) {
 	if f == nil {
 		return nil, errMetricsToMetrics
 	}
-	return f(ctx, set, cfg, nextConsumer)
+	return f(ctx, set, cfg, nextConsumers)
 }
 
 // CreateMetricsToLogsFunc is the equivalent of Factory.CreateMetricsToLogs().
@@ -260,19 +260,19 @@ func (f CreateLogsToTracesFunc) CreateLogsToTraces(
 }
 
 // CreateLogsToMetricssFunc is the equivalent of Factory.CreateLogsToMetrics().
-type CreateLogsToMetricsFunc func(context.Context, CreateSettings, component.Config, consumer.Metrics) (Logs, error)
+type CreateLogsToMetricsFunc func(context.Context, CreateSettings, component.Config, *MetricsConsumerMap) (Logs, error)
 
 // CreateLogsToMetrics implements Factory.CreateLogsToMetrics().
 func (f CreateLogsToMetricsFunc) CreateLogsToMetrics(
 	ctx context.Context,
 	set CreateSettings,
 	cfg component.Config,
-	nextConsumer consumer.Metrics,
+	nextConsumers *MetricsConsumerMap,
 ) (Logs, error) {
 	if f == nil {
 		return nil, errLogsToMetrics
 	}
-	return f(ctx, set, cfg, nextConsumer)
+	return f(ctx, set, cfg, nextConsumers)
 }
 
 // CreateLogsToLogsFunc is the equivalent of Factory.CreateLogsToLogs().
@@ -467,6 +467,65 @@ func MakeFactoryMap(factories ...Factory) (map[component.Type]Factory, error) {
 		fMap[f.Type()] = f
 	}
 	return fMap, nil
+}
+
+// MetricsConsumerMap provides access to individual logs consumers. Other component types
+// are provided a single "fanout" consumer. However, connectors may need to route signals
+// a specific consumer or subset of consumers. This struct provides easy ways to build
+// fanout consumers that represent the desired set of consumers.
+// TODO pull all responsibility for constructing fanout consumers into this package.
+type MetricsConsumerMap struct {
+	consumerMap map[component.ID]consumer.Metrics
+}
+
+// connectors always emit to fanInNodes (TODO make an interface for this)
+func NewMetricsConsumerMap(consumers ...MetricsConsumer) *MetricsConsumerMap {
+	mcm := &MetricsConsumerMap{
+		consumerMap: make(map[component.ID]consumer.Metrics, len(consumers)),
+	}
+	for _, c := range consumers {
+		mcm.consumerMap[c.PipelineID()] = c
+	}
+	return mcm
+}
+
+func (mcm *MetricsConsumerMap) Fanout() consumer.Metrics {
+	allConsumers := make([]consumer.Metrics, 0, len(mcm.consumerMap))
+	for _, c := range mcm.consumerMap {
+		allConsumers = append(allConsumers, c)
+	}
+	return fanoutconsumer.NewMetrics(allConsumers)
+}
+
+func (mcm *MetricsConsumerMap) FanoutToPipelines(pipelineIDs []component.ID) (consumer.Metrics, error) {
+	if len(pipelineIDs) == 0 {
+		return nil, fmt.Errorf("minimum one consumer pipeline")
+	}
+
+	if len(pipelineIDs) == 1 {
+		c, ok := mcm.consumerMap[pipelineIDs[0]]
+		if !ok {
+			return nil, fmt.Errorf("no consumer for pipeline: %s", pipelineIDs[0])
+		}
+		return c, nil
+	}
+
+	allConsumers := make([]consumer.Metrics, 0, len(pipelineIDs))
+	for _, pid := range pipelineIDs {
+		c, ok := mcm.consumerMap[pipelineIDs[0]]
+		if !ok {
+			return nil, fmt.Errorf("no consumer for pipeline: %s", pid)
+		}
+		allConsumers = append(allConsumers, c)
+	}
+	return fanoutconsumer.NewMetrics(allConsumers), nil
+}
+
+// Consumer is a consumer to which a connector can emit. It always
+// belongs to a specific pipeline
+type MetricsConsumer interface {
+	consumer.Metrics
+	PipelineID() component.ID
 }
 
 // LogsConsumerMap provides access to individual logs consumers. Other component types
