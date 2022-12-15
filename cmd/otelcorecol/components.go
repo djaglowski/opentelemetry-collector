@@ -7,6 +7,7 @@ import (
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver"
 
 	"go.opentelemetry.io/collector/connector"
+	countconnector "go.opentelemetry.io/collector/connector/countconnector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 	routeconnector "go.opentelemetry.io/collector/connector/routeconnector"
 	"go.opentelemetry.io/collector/exporter"
@@ -63,6 +64,7 @@ func components() (otelcol.Factories, error) {
 	}
 
 	factories.Connectors, err = connector.MakeFactoryMap(
+		countconnector.NewFactory(),
 		forwardconnector.NewFactory(),
 		routeconnector.NewFactory(),
 	)

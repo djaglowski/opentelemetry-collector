@@ -25,7 +25,7 @@ import (
 )
 
 type MetricsRoute struct {
-	MetricsCondition `mapstructure:"condition"`
+	MetricsCondition `mapstructure:",squash"`
 	Pipelines        []component.ID `mapstructure:"pipelines"`
 }
 
@@ -62,7 +62,7 @@ func (c MetricsCondition) Match(md pmetric.Metrics) bool {
 		for j := 0; j < sms.Len(); j++ {
 			ms := sms.At(j).Metrics()
 			for k := 0; k < ms.Len(); k++ {
-				dps := ms.At(k).Gauge().DataPoints()
+				dps := ms.At(k).Sum().DataPoints()
 				for l := 0; l < dps.Len(); l++ {
 					if c.MinInt != nil && dps.At(l).IntValue() >= int64(*c.MinInt) {
 						return true
@@ -90,7 +90,7 @@ func (f *routeFactory) createMetrics(
 	cfg component.Config,
 	nextConsumers *connector.MetricsConsumerMap,
 ) (connector.Metrics, error) {
-	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
+	comp, err := f.GetOrAdd(cfg, func() (component.Component, error) {
 		rCfg, ok := cfg.(*Config)
 		if !ok {
 			return nil, fmt.Errorf("not a route config")
@@ -109,6 +109,9 @@ func (f *routeFactory) createMetrics(
 		}
 		return r, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	conn := comp.Unwrap().(*router)
 	return conn, nil
@@ -117,9 +120,7 @@ func (f *routeFactory) createMetrics(
 func (r *router) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
 	for _, route := range r.metricsTable {
 		if route.MetricsCondition.Match(md) {
-			if err := route.ConsumeMetrics(ctx, md); err != nil {
-				return err
-			}
+			return route.ConsumeMetrics(ctx, md)
 		}
 	}
 	return nil // No match, just drop

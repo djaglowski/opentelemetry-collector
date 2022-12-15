@@ -7,42 +7,72 @@ Additionally, one or more default pipelines may be specified.
 
 ## Example Config
 
+The following configuration will do the following:
+
+- Read logs from `./local/in/test.log`, expecting the following format: `sev=debug`, `sev=error`, etc
+- Route error (or higher) logs to `./local/out/log_errs.log`
+- Route other logs (lower than error) to `./local/out/log_other.log`
+- Count the number of logs read at a time
+- Route counts of `1` to `./local/out/count_ones.log`
+- Route other counts to `./local/out/count_other.log`
+
 ```yaml
 receivers:
   filelog:
     include: ./local/router/in/test.log
+    operators:
+      - type: key_value_parser
+        delimiter: "="
+        severity:
+          parse_from: attributes.sev
 
 connectors:
-  route:
+  route/logs:
     logs:
-      - condition: "false"
-        pipelines: logs/out/one
-      - condition: "true"
-        pipelines: logs/out/two
-    default: logs/out/default
+      - min_severity: error
+        pipelines: logs/errs
+      - match_all: true
+        pipelines: logs/other
+  count:
+  route/counts:
+    metrics:
+      - max_int: 1
+        pipelines: metrics/ones
+      - match_all: true
+        pipelines: metrics/other
 
 exporters:
-  file/one:
-    path: ./local/router/out/one.log
-  file/two:
-    path: ./local/router/out/two.log
-  file/default:
-    path: ./local/router/out/default.log
+  file/log_errs:
+    path: ./local/router/out/log_errs.log
+  file/log_other:
+    path: ./local/router/out/log_other.log
+  file/count_ones:
+    path: ./local/router/out/count_ones.log
+  file/count_other:
+    path: ./local/router/out/count_other.log
+
 
 service:
   pipelines:
     logs/in:
       receivers: [filelog]
-      exporters: [route]
-    logs/out/one:
-      receivers: [route]
-      exporters: [file/one]
-    logs/out/two:
-      receivers: [route]
-      exporters: [file/two]
-    logs/out/default:
-      receivers: [route]
-      exporters: [file/default]
+      exporters: [route/logs, count]
+    logs/errs:
+      receivers: [route/logs]
+      exporters: [file/log_errs]
+    logs/other:
+      receivers: [route/logs]
+      exporters: [file/log_other]
+
+    metrics/counts:
+      receivers: [count]
+      exporters: [route/counts]
+    metrics/ones:
+      receivers: [route/counts]
+      exporters: [file/count_ones]
+    metrics/other:
+      receivers: [route/counts]
+      exporters: [file/count_other]
 ```
 
 ## Limitations

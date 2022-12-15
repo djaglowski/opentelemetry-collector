@@ -26,7 +26,7 @@ import (
 )
 
 type LogsRoute struct {
-	LogsCondition `mapstructure:"condition"`
+	LogsCondition `mapstructure:",squash"`
 	Pipelines     []component.ID `mapstructure:"pipelines"`
 }
 
@@ -94,7 +94,7 @@ func (f *routeFactory) createLogs(
 	cfg component.Config,
 	nextConsumers *connector.LogsConsumerMap,
 ) (connector.Logs, error) {
-	comp, _ := f.GetOrAdd(cfg, func() (component.Component, error) {
+	comp, err := f.GetOrAdd(cfg, func() (component.Component, error) {
 		rCfg, ok := cfg.(*Config)
 		if !ok {
 			return nil, fmt.Errorf("not a route config")
@@ -113,6 +113,9 @@ func (f *routeFactory) createLogs(
 		}
 		return r, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	conn := comp.Unwrap().(*router)
 	return conn, nil
@@ -121,9 +124,7 @@ func (f *routeFactory) createLogs(
 func (r *router) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	for _, route := range r.logsTable {
 		if route.LogsCondition.Match(ld) {
-			if err := route.ConsumeLogs(ctx, ld); err != nil {
-				return err
-			}
+			return route.ConsumeLogs(ctx, ld)
 		}
 	}
 	return nil // No match, just drop
