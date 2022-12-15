@@ -14,7 +14,7 @@ receivers:
 
 connectors:
   route:
-    table:
+    logs:
       - condition: "false"
         pipelines: logs/out/one
       - condition: "true"

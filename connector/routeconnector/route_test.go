@@ -33,151 +33,177 @@ func TestValidate(t *testing.T) {
 			err:  true,
 		},
 		{
-			name: "only_default_one",
+			name: "logs/missing_pipelines",
 			cfg: &Config{
-				Default: []component.ID{component.NewID("logs")},
-			},
-			err: true,
-		},
-		{
-			name: "only_default_two",
-			cfg: &Config{
-				Default: []component.ID{component.NewID("logs"), component.NewIDWithName("logs", "1")},
-			},
-			err: true,
-		},
-		{
-			name: "only_one_route_one",
-			cfg: &Config{
-				Table: []Route{
+				LogsTable: []LogsRoute{
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewID("logs")},
+						LogsCondition: LogsCondition{MinSeverity: "debug"},
+					},
+					{
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
 					},
 				},
 			},
 			err: true,
 		},
 		{
-			name: "only_one_route_two",
+			name: "logs/missing_condition",
 			cfg: &Config{
-				Table: []Route{
+				LogsTable: []LogsRoute{
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewID("logs"), component.NewIDWithName("logs", "1")},
-					},
-				},
-			},
-			err: true,
-		},
-		{
-			name: "missing_condition",
-			cfg: &Config{
-				Table: []Route{
-					{
-						Condition: "true",
 						Pipelines: []component.ID{component.NewID("logs")},
 					},
 					{
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1")},
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
 					},
 				},
 			},
 			err: true,
 		},
 		{
-			name: "two_routes",
+			name: "logs/invalid_sev",
 			cfg: &Config{
-				Table: []Route{
+				LogsTable: []LogsRoute{
 					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewID("logs")},
+						LogsCondition: LogsCondition{MinSeverity: "derp"},
+						Pipelines:     []component.ID{component.NewID("logs")},
 					},
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1")},
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			name: "logs/min_sev/one_out",
+			cfg: &Config{
+				LogsTable: []LogsRoute{
+					{
+						LogsCondition: LogsCondition{MinSeverity: "debug"},
+						Pipelines:     []component.ID{component.NewID("logs")},
+					},
+					{
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
 					},
 				},
 			},
 		},
 		{
-			name: "default_and_one_route",
+			name: "logs/min_sev/two_outs",
 			cfg: &Config{
-				Table: []Route{
+				LogsTable: []LogsRoute{
 					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewID("logs")},
+						LogsCondition: LogsCondition{MinSeverity: "debug"},
+						Pipelines:     []component.ID{component.NewID("logs"), component.NewIDWithName("logs", "1")},
+					},
+					{
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
 					},
 				},
-				Default: []component.ID{component.NewID("logs")},
 			},
 		},
 		{
-			name: "default_and_two_routes",
+			name: "logs/multiple_condition",
 			cfg: &Config{
-				Table: []Route{
+				LogsTable: []LogsRoute{
 					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1")},
+						LogsCondition: LogsCondition{MinSeverity: "error"},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "err"), component.NewIDWithName("logs", "all")},
 					},
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "2")},
+						LogsCondition: LogsCondition{MinSeverity: "debug"},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "all")},
+					},
+					{
+						LogsCondition: LogsCondition{MatchAll: true},
+						Pipelines:     []component.ID{component.NewIDWithName("logs", "file")},
 					},
 				},
-				Default: []component.ID{component.NewID("logs")},
 			},
 		},
 		{
-			name: "default_multi_and_two_routes",
+			name: "metrics/missing_pipelines",
 			cfg: &Config{
-				Table: []Route{
+				MetricsTable: []MetricsRoute{
 					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1")},
+						MetricsCondition: MetricsCondition{MinInt: func() *int {
+							i := 100
+							return &i
+						}()},
 					},
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "2")},
+						MetricsCondition: MetricsCondition{MatchAll: true},
+						Pipelines:        []component.ID{component.NewIDWithName("metrics", "file")},
 					},
 				},
-				Default: []component.ID{component.NewID("logs"), component.NewIDWithName("logs", "3")},
+			},
+			err: true,
+		},
+		{
+			name: "metrics/missing_condition",
+			cfg: &Config{
+				MetricsTable: []MetricsRoute{
+					{
+						Pipelines: []component.ID{component.NewID("metrics")},
+					},
+					{
+						MetricsCondition: MetricsCondition{MatchAll: true},
+						Pipelines:        []component.ID{component.NewIDWithName("metrics", "file")},
+					},
+				},
+			},
+			err: true,
+		},
+		{
+			name: "metrics/min_max",
+			cfg: &Config{
+				MetricsTable: []MetricsRoute{
+					{
+						MetricsCondition: MetricsCondition{MinInt: func() *int {
+							i := 70
+							return &i
+						}()},
+						Pipelines: []component.ID{component.NewIDWithName("metrics", "high")},
+					},
+					{
+						MetricsCondition: MetricsCondition{MaxInt: func() *int {
+							i := 30
+							return &i
+						}()},
+						Pipelines: []component.ID{component.NewIDWithName("metrics", "low")},
+					},
+				},
 			},
 		},
 		{
-			name: "default_and_multi_routes",
+			name: "metrics/multiple_condition",
 			cfg: &Config{
-				Table: []Route{
+				MetricsTable: []MetricsRoute{
 					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1"), component.NewIDWithName("logs", "3")},
+						MetricsCondition: MetricsCondition{MinInt: func() *int {
+							i := 70
+							return &i
+						}()},
+						Pipelines: []component.ID{component.NewIDWithName("metrics", "high")},
 					},
 					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "2")},
+						MetricsCondition: MetricsCondition{MaxInt: func() *int {
+							i := 30
+							return &i
+						}()},
+						Pipelines: []component.ID{component.NewIDWithName("metrics", "low")},
+					},
+					{
+						MetricsCondition: MetricsCondition{MatchAll: true},
+						Pipelines:        []component.ID{component.NewIDWithName("metrics", "file")},
 					},
 				},
-				Default: []component.ID{component.NewID("logs")},
-			},
-		},
-		{
-			name: "multi_multi",
-			cfg: &Config{
-				Table: []Route{
-					{
-						Condition: "false",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "1"), component.NewIDWithName("logs", "3")},
-					},
-					{
-						Condition: "also_false",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "2"), component.NewIDWithName("logs", "3")},
-					},
-					{
-						Condition: "true",
-						Pipelines: []component.ID{component.NewIDWithName("logs", "2")},
-					},
-				},
-				Default: []component.ID{component.NewID("logs"), component.NewIDWithName("logs", "3")},
 			},
 		},
 	}
