@@ -8,6 +8,7 @@ import (
 
 	"go.opentelemetry.io/collector/connector"
 	countconnector "go.opentelemetry.io/collector/connector/countconnector"
+	finitestaterouterconnector "go.opentelemetry.io/collector/connector/finitestaterouterconnector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 	routeconnector "go.opentelemetry.io/collector/connector/routeconnector"
 	"go.opentelemetry.io/collector/exporter"
@@ -65,6 +66,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Connectors, err = connector.MakeFactoryMap(
 		countconnector.NewFactory(),
+		finitestaterouterconnector.NewFactory(),
 		forwardconnector.NewFactory(),
 		routeconnector.NewFactory(),
 	)

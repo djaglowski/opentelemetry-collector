@@ -21,6 +21,7 @@ processors:
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.67.0
 connectors:
   - gomod: go.opentelemetry.io/collector/connector/countconnector v0.67.0
+  - gomod: go.opentelemetry.io/collector/connector/finitestaterouterconnector v0.67.0
   - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.67.0
   - gomod: go.opentelemetry.io/collector/connector/routeconnector v0.67.0
 
@@ -30,6 +31,7 @@ replaces:
   - go.opentelemetry.io/collector/confmap => ../../confmap
   - go.opentelemetry.io/collector/consumer => ../../consumer
   - go.opentelemetry.io/collector/connector/countconnector => ../../connector/countconnector
+  - go.opentelemetry.io/collector/connector/finitestaterouterconnector => ../../connector/finitestaterouterconnector
   - go.opentelemetry.io/collector/connector/forwardconnector => ../../connector/forwardconnector
   - go.opentelemetry.io/collector/connector/routeconnector => ../../connector/routeconnector
   - go.opentelemetry.io/collector/exporter/loggingexporter => ../../exporter/loggingexporter
