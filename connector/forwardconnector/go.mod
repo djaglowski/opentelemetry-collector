@@ -4,10 +4,17 @@ go 1.18
 
 require (
 	github.com/stretchr/testify v1.8.1
+<<<<<<< HEAD
 	go.opentelemetry.io/collector v0.69.1
 	go.opentelemetry.io/collector/component v0.69.1
 	go.opentelemetry.io/collector/consumer v0.69.1
 	go.opentelemetry.io/collector/pdata v1.0.0-rc3
+=======
+	go.opentelemetry.io/collector v0.68.0
+	go.opentelemetry.io/collector/component v0.68.0
+	go.opentelemetry.io/collector/consumer v0.68.0
+	go.opentelemetry.io/collector/pdata v1.0.0-rc2
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
 )
 
 require (
@@ -22,8 +29,13 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/confmap v0.69.1 // indirect
 	go.opentelemetry.io/collector/featuregate v0.69.1 // indirect
+=======
+	go.opentelemetry.io/collector/confmap v0.68.0 // indirect
+	go.opentelemetry.io/collector/featuregate v0.68.0 // indirect
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
 	go.opentelemetry.io/otel v1.11.2 // indirect
 	go.opentelemetry.io/otel/metric v0.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.11.2 // indirect

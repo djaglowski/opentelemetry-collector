@@ -6,7 +6,11 @@ require (
 	github.com/knadh/koanf v1.4.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.8.1
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/featuregate v0.69.1
+=======
+	go.opentelemetry.io/collector/featuregate v0.68.0
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
 	go.uber.org/multierr v1.9.0
 	gopkg.in/yaml.v3 v3.0.1
 )

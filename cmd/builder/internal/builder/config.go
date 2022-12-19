@@ -26,7 +26,11 @@ import (
 	"go.uber.org/zap"
 )
 
+<<<<<<< HEAD
 const defaultOtelColVersion = "0.69.1"
+=======
+const defaultOtelColVersion = "0.68.0"
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
 
 // ErrInvalidGoMod indicates an invalid gomod
 var ErrInvalidGoMod = errors.New("invalid gomod specification for module")

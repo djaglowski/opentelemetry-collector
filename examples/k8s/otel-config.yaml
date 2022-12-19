@@ -66,7 +66,11 @@ spec:
       - command:
           - "/otelcol"
           - "--config=/conf/otel-agent-config.yaml"
+<<<<<<< HEAD
         image: otel/opentelemetry-collector:0.69.1
+=======
+        image: otel/opentelemetry-collector:0.68.0
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
         name: otel-agent
         resources:
           limits:
@@ -177,7 +181,11 @@ spec:
       - command:
           - "/otelcol"
           - "--config=/conf/otel-collector-config.yaml"
+<<<<<<< HEAD
         image: otel/opentelemetry-collector:0.69.1
+=======
+        image: otel/opentelemetry-collector:0.68.0
+>>>>>>> 26f243de ([chore] prepare release 0.68.0 (#6822))
         name: otel-collector
         resources:
           limits:
