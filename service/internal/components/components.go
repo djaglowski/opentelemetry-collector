@@ -30,3 +30,32 @@ func LogStabilityLevel(logger *zap.Logger, sl component.StabilityLevel) {
 		logger.Info(sl.LogMessage(), zap.String(ZapStabilityKey, sl.String()))
 	}
 }
+
+func ReceiverLogger(logger *zap.Logger, id component.ID, dt component.DataType) *zap.Logger {
+	return logger.With(
+		zap.String(ZapKindKey, ZapKindReceiver),
+		zap.String(ZapNameKey, id.String()),
+		zap.String(ZapKindPipeline, string(dt)))
+}
+
+func ProcessorLogger(logger *zap.Logger, procID component.ID, pipelineID component.ID) *zap.Logger {
+	return logger.With(
+		zap.String(ZapKindKey, ZapKindProcessor),
+		zap.String(ZapNameKey, procID.String()),
+		zap.String(ZapKindPipeline, pipelineID.String()))
+}
+
+func ExporterLogger(logger *zap.Logger, id component.ID, dt component.DataType) *zap.Logger {
+	return logger.With(
+		zap.String(ZapKindKey, ZapKindExporter),
+		zap.String(ZapDataTypeKey, string(dt)),
+		zap.String(ZapNameKey, id.String()))
+}
+
+func ConnectorLogger(logger *zap.Logger, connID component.ID, expPipelineType, rcvrPipelineType component.DataType) *zap.Logger {
+	return logger.With(
+		zap.String(ZapKindKey, ZapKindExporter),
+		zap.String(ZapNameKey, connID.String()),
+		zap.String(ZapRoleExporterInPipeline, string(expPipelineType)),
+		zap.String(ZapRoleReceiverInPipeline, string(rcvrPipelineType)))
+}

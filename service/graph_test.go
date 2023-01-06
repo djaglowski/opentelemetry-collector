@@ -18,6 +18,8 @@ import (
 	"context"
 	"testing"
 
+	"go.opentelemetry.io/collector/service/internal/components"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -55,31 +57,31 @@ func newPipelineSpec(id component.ID) *pipelineSpec {
 
 func (ps *pipelineSpec) withExampleReceiver(name string) *pipelineSpec {
 	rID := component.NewIDWithName(component.Type("examplereceiver"), name)
-	ps.receiverIDs[newReceiverNodeID(ps.id.Type(), rID).ID()] = rID
+	ps.receiverIDs[components.NewReceiverNode(ps.id, rID).ID()] = rID
 	return ps
 }
 
 func (ps *pipelineSpec) withExampleProcessor(name string) *pipelineSpec {
 	pID := component.NewIDWithName(component.Type("exampleprocessor"), name)
-	ps.processorIDs[newProcessorNodeID(ps.id, pID).ID()] = pID
+	ps.processorIDs[components.NewProcessorNode(ps.id, pID).ID()] = pID
 	return ps
 }
 
 func (ps *pipelineSpec) withExampleExporter(name string) *pipelineSpec {
 	eID := component.NewIDWithName(component.Type("exampleexporter"), name)
-	ps.exporterIDs[newExporterNodeID(ps.id.Type(), eID).ID()] = eID
+	ps.exporterIDs[components.NewExporterNode(ps.id, eID).ID()] = eID
 	return ps
 }
 
 func (ps *pipelineSpec) withExampleConnectorAsReceiver(name string, fromType component.Type) *pipelineSpec {
 	cID := component.NewIDWithName(component.Type("exampleconnector"), name)
-	ps.receiverIDs[newConnectorNodeID(fromType, ps.id.Type(), cID).ID()] = cID
+	ps.receiverIDs[components.NewConnectorNode(fromType, ps.id.Type(), cID).ID()] = cID
 	return ps
 }
 
 func (ps *pipelineSpec) withExampleConnectorAsExporter(name string, toType component.Type) *pipelineSpec {
 	cID := component.NewIDWithName(component.Type("exampleconnector"), name)
-	ps.exporterIDs[newConnectorNodeID(ps.id.Type(), toType, cID).ID()] = cID
+	ps.exporterIDs[components.NewConnectorNode(ps.id.Type(), toType, cID).ID()] = cID
 	return ps
 }
 
@@ -109,9 +111,9 @@ func (pg *pipelineGraph) toStatefulComponentPipeline() *statefulComponentPipelin
 
 	for _, r := range pg.receivers {
 		switch c := r.(type) {
-		case *receiverNode:
+		case *components.ReceiverNode:
 			statefulPipeline.receivers[c.ID()] = c.Component.(*testcomponents.ExampleReceiver)
-		case *connectorNode:
+		case *components.ConnectorNode:
 			// connector needs to be unwrapped to access component as ExampleConnector
 			switch ct := c.Component.(type) {
 			case connector.Traces:
@@ -125,15 +127,15 @@ func (pg *pipelineGraph) toStatefulComponentPipeline() *statefulComponentPipelin
 	}
 
 	for _, p := range pg.processors {
-		pn := p.(*processorNode)
+		pn := p.(*components.ProcessorNode)
 		statefulPipeline.processors[pn.ID()] = pn.Component.(*testcomponents.ExampleProcessor)
 	}
 
 	for _, e := range pg.exporters {
 		switch c := e.(type) {
-		case *exporterNode:
+		case *components.ExporterNode:
 			statefulPipeline.exporters[c.ID()] = c.Component.(*testcomponents.ExampleExporter)
-		case *connectorNode:
+		case *components.ConnectorNode:
 			// connector needs to be unwrapped to access component as ExampleConnector
 			switch ct := c.Component.(type) {
 			case connector.Traces:
@@ -771,7 +773,6 @@ func TestConnectorPipelinesGraph(t *testing.T) {
 					Exporters:  []component.ID{component.NewID("exampleexporter")},
 				},
 			},
-
 			expectedPerExporter: 3,
 		},
 	}
@@ -779,7 +780,7 @@ func TestConnectorPipelinesGraph(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Build the pipeline
-			pipelinesInterface, err := buildPipelinesGraph(context.Background(), pipelinesSettings{
+			set := pipelinesSettings{
 				Telemetry: componenttest.NewNopTelemetrySettings(),
 				BuildInfo: component.NewDefaultBuildInfo(),
 				Receivers: receiver.NewBuilder(
@@ -820,7 +821,9 @@ func TestConnectorPipelinesGraph(t *testing.T) {
 					},
 				),
 				PipelineConfigs: test.pipelineConfigs,
-			})
+			}
+
+			pipelinesInterface, err := buildPipelinesGraph(context.Background(), set)
 			require.NoError(t, err)
 
 			allPipelines, ok := pipelinesInterface.(*pipelinesGraph)
@@ -1531,7 +1534,7 @@ func TestGraphBuildErrors(t *testing.T) {
 					Exporters:  []component.ID{component.NewIDWithName("nop", "conn")},
 				},
 			},
-			expected: "cycle detected: connector \"nop/conn\", processor \"nop\", connector \"nop/conn\"",
+			expected: "cycle detected: processor \"nop\", connector \"nop/conn\", processor \"nop\"",
 		},
 		{
 			name: "not_allowed_deep_cycle_traces.yaml",
@@ -1612,7 +1615,7 @@ func TestGraphBuildErrors(t *testing.T) {
 					Exporters:  []component.ID{component.NewID("nop")},
 				},
 			},
-			expected: "cycle detected: processor \"nop\", connector \"nop/conn\", processor \"nop\", connector \"nop/conn1\", processor \"nop\"",
+			expected: "cycle detected: connector \"nop/conn\", processor \"nop\", connector \"nop/conn1\", processor \"nop\", connector \"nop/conn\"",
 			// TODO rebuild cycle in order
 		},
 		{
@@ -1653,7 +1656,7 @@ func TestGraphBuildErrors(t *testing.T) {
 					Exporters:  []component.ID{component.NewID("nop")},
 				},
 			},
-			expected: "cycle detected: connector \"nop/conn1\", processor \"nop\", processor \"nop\", connector \"nop/conn\", connector \"nop/conn1\"",
+			expected: "cycle detected: processor \"nop\", connector \"nop/conn1\", processor \"nop\", connector \"nop/conn\", processor \"nop\"",
 			// TODO rebuild cycle in order
 		},
 		{
@@ -1710,7 +1713,7 @@ func TestGraphBuildErrors(t *testing.T) {
 					Exporters:  []component.ID{component.NewIDWithName("nop", "fork")}, // cannot loop back to "nop/fork"
 				},
 			},
-			expected: "cycle detected: processor \"nop\", processor \"nop\", connector \"nop/fork\", connector \"nop/forkagain\", processor \"nop\", connector \"nop/rawlog\", processor \"nop\"",
+			expected: "cycle detected: connector \"nop/fork\", connector \"nop/rawlog\", processor \"nop\", processor \"nop\", processor \"nop\", connector \"nop/forkagain\", connector \"nop/fork\"",
 		},
 		{
 			name: "unknown_exporter_config",
@@ -2031,11 +2034,11 @@ func (g *pipelinesGraph) getReceivers() map[component.DataType]map[component.ID]
 	for _, pg := range g.pipelineGraphs {
 		for _, rcvrNode := range pg.receivers {
 			rcvrOrConnNode := g.componentGraph.Node(rcvrNode.ID())
-			rcvrNode, ok := rcvrOrConnNode.(*receiverNode)
+			rcvrNode, ok := rcvrOrConnNode.(*components.ReceiverNode)
 			if !ok {
 				continue
 			}
-			receiversMap[rcvrNode.pipelineType][rcvrNode.componentID] = rcvrNode.Component
+			receiversMap[rcvrNode.PipelineType()][rcvrNode.ComponentID()] = rcvrNode.Component
 		}
 	}
 	return receiversMap

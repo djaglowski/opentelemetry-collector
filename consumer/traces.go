@@ -23,7 +23,7 @@ import (
 // Traces is an interface that receives ptrace.Traces, processes it
 // as needed, and sends it to the next processing node if any or to the destination.
 type Traces interface {
-	baseConsumer
+	Consumer
 	// ConsumeTraces receives ptrace.Traces for consumption.
 	ConsumeTraces(ctx context.Context, td ptrace.Traces) error
 }

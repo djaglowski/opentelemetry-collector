@@ -28,7 +28,7 @@ type Capabilities struct {
 	MutatesData bool
 }
 
-type baseConsumer interface {
+type Consumer interface {
 	Capabilities() Capabilities
 }
 

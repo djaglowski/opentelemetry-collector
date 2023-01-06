@@ -23,7 +23,7 @@ import (
 // Metrics is the new metrics consumer interface that receives pmetric.Metrics, processes it
 // as needed, and sends it to the next processing node if any or to the destination.
 type Metrics interface {
-	baseConsumer
+	Consumer
 	// ConsumeMetrics receives pmetric.Metrics for consumption.
 	ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error
 }

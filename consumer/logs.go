@@ -23,7 +23,7 @@ import (
 // Logs is an interface that receives plog.Logs, processes it
 // as needed, and sends it to the next processing node if any or to the destination.
 type Logs interface {
-	baseConsumer
+	Consumer
 	// ConsumeLogs receives plog.Logs for consumption.
 	ConsumeLogs(ctx context.Context, ld plog.Logs) error
 }
