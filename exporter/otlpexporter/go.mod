@@ -9,7 +9,7 @@ require (
 	go.opentelemetry.io/collector/confmap v0.72.0
 	go.opentelemetry.io/collector/consumer v0.72.0
 	go.opentelemetry.io/collector/pdata v1.0.0-rc6
-	go.uber.org/atomic v1.10.0
+	go.uber.org/atomic v1.11.0
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
