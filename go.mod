@@ -10,7 +10,7 @@ require (
 	github.com/klauspost/compress v1.16.0
 	github.com/mostynb/go-grpc-compression v1.1.17
 	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.40.0
 	github.com/rs/cors v1.8.3
 	github.com/shirou/gopsutil/v3 v3.23.1
@@ -79,7 +79,7 @@ require (
 	go.opentelemetry.io/contrib/zpages v0.39.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
