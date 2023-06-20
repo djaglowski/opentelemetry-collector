@@ -4,7 +4,7 @@
 | ------------------------ | --------------------- |
 | Stability                | traces [stable]       |
 |                          | metrics [stable]      |
-|                          | logs [beta]           |
+|                          | logs [stable]         |
 | Supported pipeline types | traces, metrics, logs |
 | Distributions            | [core], [contrib]     |
 
@@ -77,7 +77,6 @@ receivers:
           max_age: 7200
 ```
 
-[beta]: https://github.com/open-telemetry/opentelemetry-collector#beta
 [contrib]: https://github.com/open-telemetry/opentelemetry-collector-releases/tree/main/distributions/otelcol-contrib
 [core]: https://github.com/open-telemetry/opentelemetry-collector-releases/tree/main/distributions/otelcol
 [stable]: https://github.com/open-telemetry/opentelemetry-collector#stable

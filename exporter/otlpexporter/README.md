@@ -4,7 +4,7 @@
 | ------------------------ | --------------------- |
 | Stability                | traces [stable]       |
 |                          | metrics [stable]      |
-|                          | logs [beta]           |
+|                          | logs [stable]         |
 | Supported pipeline types | traces, metrics, logs |
 | Distributions            | [core], [contrib]     |
 
@@ -54,7 +54,6 @@ Several helper files are leveraged to provide additional capabilities automatica
 - [TLS and mTLS settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configtls/README.md)
 - [Queuing, retry and timeout settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md)
 
-[beta]: https://github.com/open-telemetry/opentelemetry-collector#beta
 [contrib]: https://github.com/open-telemetry/opentelemetry-collector-releases/tree/main/distributions/otelcol-contrib
 [core]: https://github.com/open-telemetry/opentelemetry-collector-releases/tree/main/distributions/otelcol
 [stable]: https://github.com/open-telemetry/opentelemetry-collector#stable
