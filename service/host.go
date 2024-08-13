@@ -30,7 +30,8 @@ type serviceHost struct {
 	connectors        *connector.Builder
 	extensions        *extension.Builder
 
-	buildInfo component.BuildInfo
+	moduleInfo extension.ModuleInfo
+	buildInfo  component.BuildInfo
 
 	pipelines         *graph.Graph
 	serviceExtensions *extensions.Extensions

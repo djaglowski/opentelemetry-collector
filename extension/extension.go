@@ -62,6 +62,15 @@ type StatusWatcher interface {
 	ComponentStatusChanged(source *component.InstanceID, event *component.StatusEvent)
 }
 
+// ModuleInfo describes the go module for each component.
+type ModuleInfo struct {
+	Receiver  map[component.Type]string
+	Processor map[component.Type]string
+	Exporter  map[component.Type]string
+	Extension map[component.Type]string
+	Connector map[component.Type]string
+}
+
 // Settings is passed to Factory.Create(...) function.
 type Settings struct {
 	// ID returns the ID of the component that will be created.
@@ -71,6 +80,8 @@ type Settings struct {
 
 	// BuildInfo can be used by components for informational purposes
 	BuildInfo component.BuildInfo
+
+	ModuleInfo ModuleInfo
 }
 
 // CreateFunc is the equivalent of Factory.Create(...) function.
