@@ -8,23 +8,23 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// Option modifies the consumer behavior.
-type Option interface {
-	apply(*options)
+// CallbackOption modifies the consumer behavior.
+type CallbackOption interface {
+	apply(*callbackOptions)
 }
 
-type options struct {
+type callbackOptions struct {
 	staticDataPointAttributes []attribute.KeyValue
 }
 
 // WithStaticDataPointAttribute returns an Option that adds a static attribute to data points.
-func WithStaticDataPointAttribute(attr attribute.KeyValue) Option {
+func WithStaticDataPointAttribute(attr attribute.KeyValue) CallbackOption {
 	return staticDataPointAttributeOption(attr)
 }
 
 type staticDataPointAttributeOption attribute.KeyValue
 
-func (o staticDataPointAttributeOption) apply(opts *options) {
+func (o staticDataPointAttributeOption) apply(opts *callbackOptions) {
 	opts.staticDataPointAttributes = append(opts.staticDataPointAttributes, attribute.KeyValue(o))
 }
 
@@ -33,7 +33,7 @@ type compiledOptions struct {
 	withFailureAttrs metric.AddOption
 }
 
-func (o *options) compile() compiledOptions {
+func (o *callbackOptions) compile() compiledOptions {
 	successAttrs := make([]attribute.KeyValue, 0, 1+len(o.staticDataPointAttributes))
 	successAttrs = append(successAttrs, attribute.String("outcome", "success"))
 	successAttrs = append(successAttrs, o.staticDataPointAttributes...)

@@ -42,7 +42,7 @@ func TestTracesConsumeSuccess(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewTraces(mockConsumer, counter)
+	consumer := obsconsumer.NewTraces(mockConsumer, obsconsumer.CountTraces(counter))
 
 	td := ptrace.NewTraces()
 	r := td.ResourceSpans().AppendEmpty()
@@ -83,7 +83,7 @@ func TestTracesConsumeFailure(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewTraces(mockConsumer, counter)
+	consumer := obsconsumer.NewTraces(mockConsumer, obsconsumer.CountTraces(counter))
 
 	td := ptrace.NewTraces()
 	r := td.ResourceSpans().AppendEmpty()
@@ -124,7 +124,8 @@ func TestTracesWithStaticAttributes(t *testing.T) {
 	require.NoError(t, err)
 
 	staticAttr := attribute.String("test", "value")
-	consumer := obsconsumer.NewTraces(mockConsumer, counter, obsconsumer.WithStaticDataPointAttribute(staticAttr))
+	consumer := obsconsumer.NewTraces(mockConsumer,
+		obsconsumer.CountTraces(counter, obsconsumer.WithStaticDataPointAttribute(staticAttr)))
 
 	td := ptrace.NewTraces()
 	r := td.ResourceSpans().AppendEmpty()
@@ -168,7 +169,7 @@ func TestTracesMultipleItemsMixedOutcomes(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewTraces(mockConsumer, counter)
+	consumer := obsconsumer.NewTraces(mockConsumer, obsconsumer.CountTraces(counter))
 
 	// First batch: 2 successful items
 	td1 := ptrace.NewTraces()
@@ -246,6 +247,55 @@ func TestTracesCapabilities(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewTraces(mockConsumer, counter)
+	consumer := obsconsumer.NewTraces(mockConsumer, obsconsumer.CountTraces(counter))
 	require.Equal(t, consumer.Capabilities(), mockConsumer.capabilities)
+}
+
+func BenchmarkConsumeTraces(b *testing.B) {
+	ctx := context.Background()
+	mockConsumer := &mockTracesConsumer{}
+
+	td := ptrace.NewTraces()
+	r := td.ResourceSpans().AppendEmpty()
+	ss := r.ScopeSpans().AppendEmpty()
+	ss.Spans().AppendEmpty()
+
+	mp := sdkmetric.NewMeterProvider()
+
+	meter := mp.Meter("test")
+	counter, err := meter.Int64Counter("test_counter")
+	require.NoError(b, err)
+
+	b.Run("no callback", func(b *testing.B) {
+		consumer := obsconsumer.NewTraces(mockConsumer)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeTraces(ctx, td)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("count callback", func(b *testing.B) {
+		consumer := obsconsumer.NewTraces(mockConsumer, obsconsumer.CountTraces(counter))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeTraces(ctx, td)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("two count callbacks", func(b *testing.B) {
+		consumer := obsconsumer.NewTraces(mockConsumer,
+			obsconsumer.CountTraces(counter),
+			obsconsumer.CountTraces(counter),
+		)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeTraces(ctx, td)
+			require.NoError(b, err)
+		}
+	})
 }

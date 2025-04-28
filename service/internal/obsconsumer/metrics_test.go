@@ -42,7 +42,7 @@ func TestMetricsConsumeSuccess(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewMetrics(mockConsumer, counter)
+	consumer := obsconsumer.NewMetrics(mockConsumer, obsconsumer.CountMetrics(counter))
 
 	md := pmetric.NewMetrics()
 	rm := md.ResourceMetrics().AppendEmpty()
@@ -84,7 +84,7 @@ func TestMetricsConsumeFailure(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewMetrics(mockConsumer, counter)
+	consumer := obsconsumer.NewMetrics(mockConsumer, obsconsumer.CountMetrics(counter))
 
 	md := pmetric.NewMetrics()
 	r := md.ResourceMetrics().AppendEmpty()
@@ -126,7 +126,8 @@ func TestMetricsWithStaticAttributes(t *testing.T) {
 	require.NoError(t, err)
 
 	staticAttr := attribute.String("test", "value")
-	consumer := obsconsumer.NewMetrics(mockConsumer, counter, obsconsumer.WithStaticDataPointAttribute(staticAttr))
+	consumer := obsconsumer.NewMetrics(mockConsumer,
+		obsconsumer.CountMetrics(counter, obsconsumer.WithStaticDataPointAttribute(staticAttr)))
 
 	md := pmetric.NewMetrics()
 	rm := md.ResourceMetrics().AppendEmpty()
@@ -172,7 +173,7 @@ func TestMetricsMultipleItemsMixedOutcomes(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewMetrics(mockConsumer, counter)
+	consumer := obsconsumer.NewMetrics(mockConsumer, obsconsumer.CountMetrics(counter))
 
 	// First batch: 2 successful items
 	md1 := pmetric.NewMetrics()
@@ -254,6 +255,56 @@ func TestMetricsCapabilities(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewMetrics(mockConsumer, counter)
+	consumer := obsconsumer.NewMetrics(mockConsumer, obsconsumer.CountMetrics(counter))
 	require.Equal(t, consumer.Capabilities(), mockConsumer.capabilities)
+}
+
+func BenchmarkConsumeMetrics(b *testing.B) {
+	ctx := context.Background()
+	mockConsumer := &mockMetricsConsumer{}
+
+	md := pmetric.NewMetrics()
+	r := md.ResourceMetrics().AppendEmpty()
+	sm := r.ScopeMetrics().AppendEmpty()
+	m := sm.Metrics().AppendEmpty()
+	m.SetEmptyGauge().DataPoints().AppendEmpty()
+
+	mp := sdkmetric.NewMeterProvider()
+
+	meter := mp.Meter("test")
+	counter, err := meter.Int64Counter("test_counter")
+	require.NoError(b, err)
+
+	b.Run("no callback", func(b *testing.B) {
+		consumer := obsconsumer.NewMetrics(mockConsumer)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeMetrics(ctx, md)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("count callback", func(b *testing.B) {
+		consumer := obsconsumer.NewMetrics(mockConsumer, obsconsumer.CountMetrics(counter))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeMetrics(ctx, md)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("two count callbacks", func(b *testing.B) {
+		consumer := obsconsumer.NewMetrics(mockConsumer,
+			obsconsumer.CountMetrics(counter),
+			obsconsumer.CountMetrics(counter),
+		)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeMetrics(ctx, md)
+			require.NoError(b, err)
+		}
+	})
 }

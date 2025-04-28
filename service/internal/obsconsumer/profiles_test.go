@@ -42,7 +42,7 @@ func TestProfilesConsumeSuccess(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewProfiles(mockConsumer, counter)
+	consumer := obsconsumer.NewProfiles(mockConsumer, obsconsumer.CountProfiles(counter))
 
 	pd := pprofile.NewProfiles()
 	r := pd.ResourceProfiles().AppendEmpty()
@@ -83,7 +83,7 @@ func TestProfilesConsumeFailure(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewProfiles(mockConsumer, counter)
+	consumer := obsconsumer.NewProfiles(mockConsumer, obsconsumer.CountProfiles(counter))
 
 	pd := pprofile.NewProfiles()
 	r := pd.ResourceProfiles().AppendEmpty()
@@ -124,7 +124,8 @@ func TestProfilesWithStaticAttributes(t *testing.T) {
 	require.NoError(t, err)
 
 	staticAttr := attribute.String("test", "value")
-	consumer := obsconsumer.NewProfiles(mockConsumer, counter, obsconsumer.WithStaticDataPointAttribute(staticAttr))
+	consumer := obsconsumer.NewProfiles(mockConsumer,
+		obsconsumer.CountProfiles(counter, obsconsumer.WithStaticDataPointAttribute(staticAttr)))
 
 	pd := pprofile.NewProfiles()
 	r := pd.ResourceProfiles().AppendEmpty()
@@ -168,7 +169,7 @@ func TestProfilesMultipleItemsMixedOutcomes(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewProfiles(mockConsumer, counter)
+	consumer := obsconsumer.NewProfiles(mockConsumer, obsconsumer.CountProfiles(counter))
 
 	// First batch: 2 successful items
 	pd1 := pprofile.NewProfiles()
@@ -246,6 +247,55 @@ func TestProfilesCapabilities(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewProfiles(mockConsumer, counter)
+	consumer := obsconsumer.NewProfiles(mockConsumer, obsconsumer.CountProfiles(counter))
 	require.Equal(t, consumer.Capabilities(), mockConsumer.capabilities)
+}
+
+func BenchmarkConsumeProfiles(b *testing.B) {
+	ctx := context.Background()
+	mockConsumer := &mockProfilesConsumer{}
+
+	pd := pprofile.NewProfiles()
+	r := pd.ResourceProfiles().AppendEmpty()
+	sp := r.ScopeProfiles().AppendEmpty()
+	sp.Profiles().AppendEmpty().Sample().AppendEmpty()
+
+	mp := sdkmetric.NewMeterProvider()
+
+	meter := mp.Meter("test")
+	counter, err := meter.Int64Counter("test_counter")
+	require.NoError(b, err)
+
+	b.Run("no callback", func(b *testing.B) {
+		consumer := obsconsumer.NewProfiles(mockConsumer)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeProfiles(ctx, pd)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("count callback", func(b *testing.B) {
+		consumer := obsconsumer.NewProfiles(mockConsumer, obsconsumer.CountProfiles(counter))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeProfiles(ctx, pd)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("two count callbacks", func(b *testing.B) {
+		consumer := obsconsumer.NewProfiles(mockConsumer,
+			obsconsumer.CountProfiles(counter),
+			obsconsumer.CountProfiles(counter),
+		)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeProfiles(ctx, pd)
+			require.NoError(b, err)
+		}
+	})
 }

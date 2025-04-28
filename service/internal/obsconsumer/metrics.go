@@ -14,36 +14,51 @@ import (
 
 var _ consumer.Metrics = metrics{}
 
-func NewMetrics(consumer consumer.Metrics, itemCounter metric.Int64Counter, opts ...Option) consumer.Metrics {
-	o := options{}
-	for _, opt := range opts {
-		opt.apply(&o)
-	}
+func NewMetrics(consumer consumer.Metrics, callbacks ...MetricsCallback) consumer.Metrics {
 	return metrics{
-		consumer:        consumer,
-		itemCounter:     itemCounter,
-		compiledOptions: o.compile(),
+		consumer:  consumer,
+		callbacks: callbacks,
 	}
 }
 
 type metrics struct {
-	consumer    consumer.Metrics
-	itemCounter metric.Int64Counter
-	compiledOptions
+	consumer  consumer.Metrics
+	callbacks []MetricsCallback
 }
 
 func (c metrics) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
-	// Measure before calling ConsumeMetrics because the data may be mutated downstream
-	itemCount := md.DataPointCount()
-	err := c.consumer.ConsumeMetrics(ctx, md)
-	if err == nil {
-		c.itemCounter.Add(ctx, int64(itemCount), c.withSuccessAttrs)
-	} else {
-		c.itemCounter.Add(ctx, int64(itemCount), c.withFailureAttrs)
+	var err error
+	for _, callback := range c.callbacks {
+		defer callback(ctx, md)(&err)
 	}
+	err = c.consumer.ConsumeMetrics(ctx, md)
 	return err
 }
 
 func (c metrics) Capabilities() consumer.Capabilities {
 	return c.consumer.Capabilities()
+}
+
+// MetricsCallback is a function that is called prior to ConsumeMetrics.
+// It returns another callback that will be called with the result of the ConsumeMetrics call.
+// It MUST NOT modify the pmetric.Metrics object in any way.
+type MetricsCallback func(ctx context.Context, md pmetric.Metrics) func(*error)
+
+// CountMetrics returns a MetricsCallback that counts the number of metrics.
+func CountMetrics(itemCounter metric.Int64Counter, opts ...CallbackOption) MetricsCallback {
+	cbos := &callbackOptions{}
+	for _, opt := range opts {
+		opt.apply(cbos)
+	}
+	compiledOptions := cbos.compile()
+	return func(ctx context.Context, md pmetric.Metrics) func(*error) {
+		itemCount := md.DataPointCount()
+		return func(err *error) {
+			if *err == nil {
+				itemCounter.Add(ctx, int64(itemCount), compiledOptions.withSuccessAttrs)
+			} else {
+				itemCounter.Add(ctx, int64(itemCount), compiledOptions.withFailureAttrs)
+			}
+		}
+	}
 }

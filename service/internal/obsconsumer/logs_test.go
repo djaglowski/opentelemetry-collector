@@ -42,7 +42,7 @@ func TestLogsConsumeSuccess(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewLogs(mockConsumer, counter)
+	consumer := obsconsumer.NewLogs(mockConsumer, obsconsumer.CountLogs(counter))
 
 	ld := plog.NewLogs()
 	r := ld.ResourceLogs().AppendEmpty()
@@ -83,7 +83,7 @@ func TestLogsConsumeFailure(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewLogs(mockConsumer, counter)
+	consumer := obsconsumer.NewLogs(mockConsumer, obsconsumer.CountLogs(counter))
 
 	ld := plog.NewLogs()
 	r := ld.ResourceLogs().AppendEmpty()
@@ -124,7 +124,8 @@ func TestLogsWithStaticAttributes(t *testing.T) {
 	require.NoError(t, err)
 
 	staticAttr := attribute.String("test", "value")
-	consumer := obsconsumer.NewLogs(mockConsumer, counter, obsconsumer.WithStaticDataPointAttribute(staticAttr))
+	consumer := obsconsumer.NewLogs(mockConsumer,
+		obsconsumer.CountLogs(counter, obsconsumer.WithStaticDataPointAttribute(staticAttr)))
 
 	ld := plog.NewLogs()
 	r := ld.ResourceLogs().AppendEmpty()
@@ -168,7 +169,7 @@ func TestLogsMultipleItemsMixedOutcomes(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewLogs(mockConsumer, counter)
+	consumer := obsconsumer.NewLogs(mockConsumer, obsconsumer.CountLogs(counter))
 
 	// First batch: 2 successful items
 	ld1 := plog.NewLogs()
@@ -246,6 +247,55 @@ func TestLogsCapabilities(t *testing.T) {
 	counter, err := meter.Int64Counter("test_counter")
 	require.NoError(t, err)
 
-	consumer := obsconsumer.NewLogs(mockConsumer, counter)
+	consumer := obsconsumer.NewLogs(mockConsumer, obsconsumer.CountLogs(counter))
 	require.Equal(t, consumer.Capabilities(), mockConsumer.capabilities)
+}
+
+func BenchmarkConsumeLogs(b *testing.B) {
+	ctx := context.Background()
+	mockConsumer := &mockLogsConsumer{}
+
+	ld := plog.NewLogs()
+	r := ld.ResourceLogs().AppendEmpty()
+	sl := r.ScopeLogs().AppendEmpty()
+	sl.LogRecords().AppendEmpty()
+
+	mp := sdkmetric.NewMeterProvider()
+
+	meter := mp.Meter("test")
+	counter, err := meter.Int64Counter("test_counter")
+	require.NoError(b, err)
+
+	b.Run("no callback", func(b *testing.B) {
+		consumer := obsconsumer.NewLogs(mockConsumer)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeLogs(ctx, ld)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("count callback", func(b *testing.B) {
+		consumer := obsconsumer.NewLogs(mockConsumer, obsconsumer.CountLogs(counter))
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeLogs(ctx, ld)
+			require.NoError(b, err)
+		}
+	})
+
+	b.Run("two count callbacks", func(b *testing.B) {
+		consumer := obsconsumer.NewLogs(mockConsumer,
+			obsconsumer.CountLogs(counter),
+			obsconsumer.CountLogs(counter),
+		)
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			err = consumer.ConsumeLogs(ctx, ld)
+			require.NoError(b, err)
+		}
+	})
 }
