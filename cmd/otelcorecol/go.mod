@@ -2,7 +2,7 @@
 
 module go.opentelemetry.io/collector/cmd/otelcorecol
 
-go 1.19
+go 1.25.0
 
 require (
 	github.com/stretchr/testify v1.8.2
@@ -18,7 +18,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.72.0
 	go.opentelemetry.io/collector/receiver v0.72.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.72.0
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.43.0
 )
 
 require (
