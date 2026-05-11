@@ -1,6 +1,6 @@
 module go.opentelemetry.io/collector/exporter/loggingexporter
 
-go 1.19
+go 1.25.0
 
 require (
 	github.com/stretchr/testify v1.8.2
@@ -10,7 +10,7 @@ require (
 	go.opentelemetry.io/collector/consumer v0.72.0
 	go.opentelemetry.io/collector/pdata v1.0.0-rc6
 	go.uber.org/zap v1.24.0
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.44.0
 )
 
 require (
