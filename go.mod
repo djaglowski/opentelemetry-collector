@@ -1,6 +1,6 @@
 module go.opentelemetry.io/collector
 
-go 1.19
+go 1.25.0
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
@@ -38,7 +38,7 @@ require (
 	go.uber.org/multierr v1.9.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.7.0
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.44.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/grpc v1.53.0
 	gopkg.in/yaml.v3 v3.0.1
